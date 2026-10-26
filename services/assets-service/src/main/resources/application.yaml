@@ -1,0 +1,53 @@
+server:
+  port: 8082
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: assets-service
+
+  # 1. Spring Data JPA Core (Uses runtime user)
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost:5432}/${DB_NAME:neondb}?sslmode=${DB_SSLMODE:prefer}&currentSchema=asset}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_APP_USER:kuleana_app}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_APP_PASSWORD:}}
+    driver-class-name: org.postgresql.Driver
+
+  # 2. Flyway Schema Migrator
+  flyway:
+    enabled: ${SPRING_FLYWAY_ENABLED:true}
+    url: ${SPRING_FLYWAY_URL:${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost:5432}/${DB_NAME:neondb}?sslmode=${DB_SSLMODE:prefer}&currentSchema=asset}}
+    user: ${SPRING_FLYWAY_USER:${DB_MIGRATION_USER:${SPRING_DATASOURCE_USERNAME:${DB_APP_USER:kuleana_app}}}}
+    password: ${SPRING_FLYWAY_PASSWORD:${DB_MIGRATION_PASSWORD:${SPRING_DATASOURCE_PASSWORD:${DB_APP_PASSWORD:}}}}
+    schemas: asset
+    create-schemas: true
+    validate-on-migrate: false
+    baseline-on-migrate: true
+    placeholders:
+      db_app_user: ${DB_APP_USER:${SPRING_DATASOURCE_USERNAME:kuleana_app}}
+
+  # 3. Hibernate Configuration
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: asset
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,prometheus,metrics"
+  endpoint:
+    health:
+      show-details: always
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:4173,http://127.0.0.1:4173}

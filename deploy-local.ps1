@@ -71,6 +71,13 @@ if ($Status) {
     }
 
     try {
+        $assetsServiceHealth = Invoke-RestMethod -Uri "http://localhost:8082/actuator/health" -TimeoutSec 4 -ErrorAction SilentlyContinue
+        Write-Host "  assets-service (8082): UP ($($assetsServiceHealth.status)) [Database: $($assetsServiceHealth.components.db.details.database)]" -ForegroundColor Green
+    } catch {
+        Write-Host "  assets-service (8082): OFFLINE / STARTING" -ForegroundColor Yellow
+    }
+
+    try {
         $uiHealth = Invoke-WebRequest -Uri "http://localhost:3000" -TimeoutSec 3 -UseBasicParsing -ErrorAction SilentlyContinue
         Write-Host "  kule-admin UI (3000):  UP (HTTP $($uiHealth.StatusCode))" -ForegroundColor Green
     } catch {
@@ -95,12 +102,12 @@ Write-Host "===============================================`n" -ForegroundColor 
 
 if (-not $NoBuild) {
     Write-Host "[1/2] Building Backend Executable JARs (Java 25)..." -ForegroundColor Yellow
-    & ".\gradlew.bat" :services:auth-service:bootJar -x test
+    & ".\gradlew.bat" :services:auth-service:bootJar :services:assets-service:bootJar -x test
     if ($LASTEXITCODE -ne 0) {
         Write-Error "[Kuleana] Backend build failed! Aborting deployment."
         exit 1
     }
-    Write-Host "       Backend JAR built successfully." -ForegroundColor Green
+    Write-Host "       Backend JARs built successfully." -ForegroundColor Green
 
     Write-Host "`n[2/2] Building Frontend Production Bundles (Vite)..." -ForegroundColor Yellow
     if (Test-Path $FrontendDir) {
@@ -168,6 +175,7 @@ Write-Host "===============================================" -ForegroundColor Gr
 Write-Host "  • Kuleana Admin UI:      http://localhost:3000" -ForegroundColor Cyan
 Write-Host "  • Kuleana Assets UI:     http://localhost:3001" -ForegroundColor Cyan
 Write-Host "  • Auth Service API:      http://localhost:8081" -ForegroundColor Cyan
+Write-Host "  • Assets Service API:    http://localhost:8082" -ForegroundColor Cyan
 Write-Host "  • Database Target:       Neon dev branch ($($env:DB_HOST))" -ForegroundColor Cyan
 Write-Host "  • Actuator Health:       http://localhost:8081/actuator/health" -ForegroundColor Cyan
 Write-Host "`nCommands:" -ForegroundColor Gray

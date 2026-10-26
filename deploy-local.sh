@@ -29,7 +29,10 @@ case "$1" in
         echo -e "\033[1;36m=== Kuleana Local Docker Status ===\033[0m"
         docker compose -f "$COMPOSE_FILE" ps
         echo -e "\nChecking health endpoints..."
-        curl -s http://localhost:8081/actuator/health || echo "auth-service: OFFLINE"
+        echo -n "auth-service (8081):   "
+        curl -s http://localhost:8081/actuator/health || echo "OFFLINE"
+        echo -e "\nassets-service (8082): "
+        curl -s http://localhost:8082/actuator/health || echo "OFFLINE"
         echo ""
         exit 0
         ;;
@@ -43,7 +46,7 @@ echo -e "\033[1;36m===============================================\033[0m\n"
 if [ "$1" != "--no-build" ]; then
     echo -e "\033[1;33m[1/2] Building Backend Executable JARs (Java 25)...\033[0m"
     cd "$SCRIPT_DIR"
-    ./gradlew :services:auth-service:bootJar -x test
+    ./gradlew :services:auth-service:bootJar :services:assets-service:bootJar -x test
 
     echo -e "\n\033[1;33m[2/2] Building Frontend Production Bundles (Vite)...\033[0m"
     if [ -d "$FRONTEND_DIR/apps/kule-admin" ]; then
@@ -71,8 +74,9 @@ echo -e "\033[1;32m===============================================\033[0m"
 echo -e "  • Kuleana Admin UI:      \033[1;36mhttp://localhost:3000\033[0m"
 echo -e "  • Kuleana Assets UI:     \033[1;36mhttp://localhost:3001\033[0m"
 echo -e "  • Auth Service API:      \033[1;36mhttp://localhost:8081\033[0m"
+echo -e "  • Assets Service API:    \033[1;36mhttp://localhost:8082\033[0m"
 echo -e "  • Database Target:       \033[1;36mNeon dev branch ($DB_HOST)\033[0m"
-echo -e "  • Actuator Health:       \033[1;36mhttp://localhost:8081/actuator/health\033[0m\n"
+echo -e "  • Actuator Health:       \033[1;36mhttp://localhost:8081/actuator/health | http://localhost:8082/actuator/health\033[0m\n"
 echo -e "Commands:"
 echo -e "  ./deploy-local.sh logs    # View live logs"
 echo -e "  ./deploy-local.sh status  # Health checks"
