@@ -1,0 +1,52 @@
+server:
+  port: 8081
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: auth-service
+
+  # 1. Spring Data JPA Core (Uses runtime user)
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost:5432}/${DB_NAME:neondb}?sslmode=require&currentSchema=auth
+    username: ${DB_APP_USER:kuleana_app}
+    password: ${DB_APP_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+
+  # 2. Flyway Schema Migrator (Overrides connection to use owner/migration user)
+  flyway:
+    enabled: true
+    url: jdbc:postgresql://${DB_HOST:localhost:5432}/${DB_NAME:neondb}?sslmode=require
+    user: ${DB_MIGRATION_USER:neondb_owner}
+    password: ${DB_MIGRATION_PASSWORD:}
+    schemas: auth
+    create-schemas: true
+    validate-on-migrate: false
+    placeholders:
+      db_app_user: ${DB_APP_USER:kuleana_app}
+
+  # 3. Hibernate Configuration
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        default_schema: auth
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,prometheus,metrics"
+  endpoint:
+    health:
+      show-details: always
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:kuleana-systems-secret-key-that-is-at-least-256-bits-long-for-hmac-sha-security}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:4173,http://127.0.0.1:4173}
