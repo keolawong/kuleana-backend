@@ -39,8 +39,9 @@ public class AssetsSecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/**", "/error").permitAll()
-                // Allow GET for active operation/shift telemetry and inventory polling
+                // Allow GET and HEAD for active operation/shift telemetry and inventory polling
                 .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
+                .requestMatchers(HttpMethod.HEAD, "/api/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/**").permitAll()
                 .requestMatchers(HttpMethod.PATCH, "/api/**").permitAll()
                 .requestMatchers(HttpMethod.DELETE, "/api/**").authenticated()
