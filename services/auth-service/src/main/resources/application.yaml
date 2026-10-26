@@ -8,22 +8,22 @@ spring:
 
   # 1. Spring Data JPA Core (Uses runtime user)
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost:5432}/${DB_NAME:neondb}?sslmode=require&currentSchema=auth
-    username: ${DB_APP_USER:kuleana_app}
-    password: ${DB_APP_PASSWORD:}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost:5432}/${DB_NAME:neondb}?sslmode=${DB_SSLMODE:prefer}&currentSchema=auth}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_APP_USER:kuleana_app}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_APP_PASSWORD:}}
     driver-class-name: org.postgresql.Driver
 
-  # 2. Flyway Schema Migrator (Overrides connection to use owner/migration user)
+  # 2. Flyway Schema Migrator (Defaults to datasource settings if not explicitly overridden)
   flyway:
-    enabled: true
-    url: jdbc:postgresql://${DB_HOST:localhost:5432}/${DB_NAME:neondb}?sslmode=require
-    user: ${DB_MIGRATION_USER:neondb_owner}
-    password: ${DB_MIGRATION_PASSWORD:}
+    enabled: ${SPRING_FLYWAY_ENABLED:true}
+    url: ${SPRING_FLYWAY_URL:${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost:5432}/${DB_NAME:neondb}?sslmode=${DB_SSLMODE:prefer}&currentSchema=auth}}
+    user: ${SPRING_FLYWAY_USER:${DB_MIGRATION_USER:${SPRING_DATASOURCE_USERNAME:${DB_APP_USER:kuleana_app}}}}
+    password: ${SPRING_FLYWAY_PASSWORD:${DB_MIGRATION_PASSWORD:${SPRING_DATASOURCE_PASSWORD:${DB_APP_PASSWORD:}}}}
     schemas: auth
     create-schemas: true
     validate-on-migrate: false
     placeholders:
-      db_app_user: ${DB_APP_USER:kuleana_app}
+      db_app_user: ${DB_APP_USER:${SPRING_DATASOURCE_USERNAME:kuleana_app}}
 
   # 3. Hibernate Configuration
   jpa:
@@ -49,4 +49,4 @@ security:
     secret: ${JWT_SECRET:kuleana-systems-secret-key-that-is-at-least-256-bits-long-for-hmac-sha-security}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:4173,http://127.0.0.1:4173}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:4173,http://127.0.0.1:4173}

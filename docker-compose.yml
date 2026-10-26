@@ -1,0 +1,72 @@
+services:
+  # Local PostgreSQL 16 (for 100% offline development or zero-dependency local testing)
+  postgres:
+    image: postgres:16-alpine
+    container_name: kuleana-postgres
+    environment:
+      POSTGRES_DB: kuleanadb
+      POSTGRES_USER: kuleana_user
+      POSTGRES_PASSWORD: kuleana_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - kuleana-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kuleana_user -d kuleanadb"]
+      interval: 4s
+      timeout: 3s
+      retries: 5
+
+  # Auth Service (Spring Boot 4 / Java 25)
+  auth-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        SERVICE_NAME: auth-service
+    container_name: kuleana-auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      DB_HOST: "postgres:5432"
+      DB_NAME: "kuleanadb"
+      DB_SSLMODE: "disable"
+      SPRING_DATASOURCE_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/kuleanadb?sslmode=disable&currentSchema=auth}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-kuleana_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-kuleana_password}
+      SPRING_FLYWAY_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/kuleanadb?sslmode=disable&currentSchema=auth}
+      SPRING_FLYWAY_USER: ${DB_USER:-kuleana_user}
+      SPRING_FLYWAY_PASSWORD: ${DB_PASSWORD:-kuleana_password}
+      DB_APP_USER: ${DB_USER:-kuleana_user}
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_FLYWAY_SCHEMAS: "auth"
+      SPRING_FLYWAY_DEFAULT_SCHEMA: "auth"
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kuleana-net
+
+  # Kuleana Admin Frontend (Vite / React / Nginx)
+  kule-admin:
+    build:
+      context: ../kuleana-frontend
+      dockerfile: docker/Dockerfile.admin
+    container_name: kuleana-admin-ui
+    ports:
+      - "3000:80"
+    depends_on:
+      - auth-service
+    networks:
+      - kuleana-net
+
+networks:
+  kuleana-net:
+    driver: bridge
+
+volumes:
+  pgdata:

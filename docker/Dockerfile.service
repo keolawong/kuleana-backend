@@ -1,0 +1,16 @@
+FROM eclipse-temurin:25-jre-alpine
+WORKDIR /app
+ARG SERVICE_NAME=auth-service
+
+# Non-root user execution per security orthodoxy
+RUN addgroup -S kuleana && adduser -S kuleana -G kuleana
+USER kuleana:kuleana
+
+# Copy pre-built bootJar artifact
+COPY services/${SERVICE_NAME}/build/libs/*-SNAPSHOT.jar app.jar
+
+ENV SPRING_PROFILES_ACTIVE=local
+ENV JAVA_OPTS="-XX:+UseZGC -XX:+ZGenerational -Xms256m -Xmx512m"
+
+EXPOSE 8081
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
