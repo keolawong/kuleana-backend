@@ -23,15 +23,15 @@ public class CreditReport {
     @Column(name = "total_amount", precision = 12, scale = 2)
     private BigDecimal totalAmount;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
     @JoinColumn(name = "operation_id")
     private Operation operation;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
     @JoinColumn(name = "shift_id")
     private Shift shift;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
     @JoinColumn(name = "gate_id")
     private Gate gate;
 
@@ -41,9 +41,17 @@ public class CreditReport {
     @Column(name = "process_id")
     private UUID processId;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
     @JoinColumn(name = "person_sticker_id")
     private Person person;
+
+    public Person getPersonSticker() {
+        return this.person;
+    }
+
+    public void setPersonSticker(Person person) {
+        this.person = person;
+    }
 
     @Column(name = "created_by", length = 100)
     private String createdBy;

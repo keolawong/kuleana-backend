@@ -53,15 +53,15 @@ public class CashBank {
     @Column(name = "status", length = 20)
     private String status;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
     @JoinColumn(name = "operation_id")
     private Operation operation;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
     @JoinColumn(name = "shift_id")
     private Shift shift;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
     @JoinColumn(name = "gate_id")
     private Gate gate;
 
@@ -74,9 +74,17 @@ public class CashBank {
     @Column(name = "process_id")
     private UUID processId;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
     @JoinColumn(name = "person_sticker_id")
     private Person person;
+
+    public Person getPersonSticker() {
+        return this.person;
+    }
+
+    public void setPersonSticker(Person person) {
+        this.person = person;
+    }
 
     @Column(name = "created_by", length = 100)
     private String createdBy;

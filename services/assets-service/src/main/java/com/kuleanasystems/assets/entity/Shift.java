@@ -19,7 +19,7 @@ public class Shift {
     @Column(name = "shift_id", nullable = false)
     private UUID shiftId;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
     @JoinColumn(name = "operation_id", nullable = false)
     private Operation operation;
 

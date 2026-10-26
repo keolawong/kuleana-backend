@@ -21,17 +21,17 @@ public class Person {
     @Column(name = "person_id", nullable = false)
     private UUID personId;
 
-    @Column(name = "first_name", length = 100)
+    @Column(name = "first_name", nullable = true, length = 100)
     private String firstName;
 
-    @Column(name = "last_name", length = 100)
+    @Column(name = "last_name", nullable = true, length = 100)
     private String lastName;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
     @JoinColumn(name = "shift_id")
     private Shift shift;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne
     @JoinColumn(name = "gate_id")
     private Gate gate;
 
@@ -63,4 +63,9 @@ public class Person {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("personStickerId")
+    public UUID getPersonStickerId() {
+        return this.personId;
+    }
 }
