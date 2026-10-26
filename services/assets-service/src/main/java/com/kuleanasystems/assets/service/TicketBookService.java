@@ -48,4 +48,12 @@ public class TicketBookService {
         book.setNextTicket(nextTicket);
         return ticketBookRepository.save(book);
     }
+
+    @Transactional
+    public TicketBook updateStatus(UUID id, String status) {
+        TicketBook book = ticketBookRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("TicketBook not found: " + id));
+        book.setStatus(status);
+        return ticketBookRepository.save(book);
+    }
 }

@@ -47,16 +47,25 @@ public class CashBankService {
     }
 
     @Transactional
-    public CashBank updateOfficialCount(UUID id, BigDecimal officialCount, Integer count100s, Integer count50s, Integer count20s, Integer count10s, Integer count5s, Integer count1s) {
+    public CashBank reconcileBank(UUID id, BigDecimal officialCount) {
         CashBank bank = cashBankRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("CashBank not found: " + id));
-        bank.setOfficialCount(officialCount);
-        if (count100s != null) bank.setCount100s(count100s);
-        if (count50s != null) bank.setCount50s(count50s);
-        if (count20s != null) bank.setCount20s(count20s);
-        if (count10s != null) bank.setCount10s(count10s);
-        if (count5s != null) bank.setCount5s(count5s);
-        if (count1s != null) bank.setCount1s(count1s);
+        if (officialCount != null) {
+            bank.setOfficialCount(officialCount);
+        }
+        bank.setStatus("RECONCILED");
         return cashBankRepository.save(bank);
+    }
+
+    @Transactional
+    public List<CashBank> reconcileBanks(List<UUID> ids, BigDecimal officialCount) {
+        List<CashBank> banks = cashBankRepository.findAllById(ids);
+        for (CashBank bank : banks) {
+            if (officialCount != null) {
+                bank.setOfficialCount(officialCount);
+            }
+            bank.setStatus("RECONCILED");
+        }
+        return cashBankRepository.saveAll(banks);
     }
 }

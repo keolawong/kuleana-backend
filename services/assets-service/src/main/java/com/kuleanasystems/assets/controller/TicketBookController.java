@@ -48,4 +48,10 @@ public class TicketBookController {
         TicketBook updated = ticketBookService.updateNextTicket(id, nextTicket);
         return ResponseEntity.ok(updated);
     }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<TicketBook> updateStatus(@PathVariable UUID id, @RequestParam String status) {
+        TicketBook updated = ticketBookService.updateStatus(id, status);
+        return ResponseEntity.ok(updated);
+    }
 }

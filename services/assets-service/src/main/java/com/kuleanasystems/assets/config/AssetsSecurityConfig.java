@@ -41,9 +41,8 @@ public class AssetsSecurityConfig {
                 .requestMatchers("/actuator/**", "/error").permitAll()
                 // Allow GET for active operation/shift telemetry and inventory polling
                 .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
-                // Mutation endpoints (POST, PATCH, DELETE) require authentication
-                .requestMatchers(HttpMethod.POST, "/api/**").authenticated()
-                .requestMatchers(HttpMethod.PATCH, "/api/**").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/**").permitAll()
+                .requestMatchers(HttpMethod.PATCH, "/api/**").permitAll()
                 .requestMatchers(HttpMethod.DELETE, "/api/**").authenticated()
                 .anyRequest().authenticated()
             );

@@ -42,4 +42,16 @@ public class CashBankController {
         CashBank updated = cashBankService.updateStatus(id, status);
         return ResponseEntity.ok(updated);
     }
+
+    @PatchMapping("/{id}/reconcile")
+    public ResponseEntity<CashBank> reconcileBank(@PathVariable UUID id, @RequestParam(required = false) java.math.BigDecimal officialCount) {
+        CashBank updated = cashBankService.reconcileBank(id, officialCount);
+        return ResponseEntity.ok(updated);
+    }
+
+    @PostMapping("/reconcile-bulk")
+    public ResponseEntity<List<CashBank>> reconcileBanks(@RequestBody List<UUID> bankIds, @RequestParam(required = false) java.math.BigDecimal officialCount) {
+        List<CashBank> updated = cashBankService.reconcileBanks(bankIds, officialCount);
+        return ResponseEntity.ok(updated);
+    }
 }
