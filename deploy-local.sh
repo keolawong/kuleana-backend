@@ -47,7 +47,15 @@ if [ "$1" != "--no-build" ]; then
 
     echo -e "\n\033[1;33m[2/2] Building Frontend Production Bundles (Vite)...\033[0m"
     if [ -d "$FRONTEND_DIR/apps/kule-admin" ]; then
+        echo -e "  -> Building kule-admin..."
         cd "$FRONTEND_DIR/apps/kule-admin"
+        npx vite build
+        cd "$SCRIPT_DIR"
+    fi
+
+    if [ -d "$FRONTEND_DIR/apps/kule-assets" ]; then
+        echo -e "  -> Building kule-assets..."
+        cd "$FRONTEND_DIR/apps/kule-assets"
         npx vite build
         cd "$SCRIPT_DIR"
     fi
@@ -61,6 +69,7 @@ echo -e "\n\033[1;32m===============================================\033[0m"
 echo -e "\033[1;32m   Deployment Complete! All services running.   \033[0m"
 echo -e "\033[1;32m===============================================\033[0m"
 echo -e "  • Kuleana Admin UI:      \033[1;36mhttp://localhost:3000\033[0m"
+echo -e "  • Kuleana Assets UI:     \033[1;36mhttp://localhost:3001\033[0m"
 echo -e "  • Auth Service API:      \033[1;36mhttp://localhost:8081\033[0m"
 echo -e "  • Database Target:       \033[1;36mNeon dev branch ($DB_HOST)\033[0m"
 echo -e "  • Actuator Health:       \033[1;36mhttp://localhost:8081/actuator/health\033[0m\n"

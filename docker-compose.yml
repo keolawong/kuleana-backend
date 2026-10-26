@@ -50,7 +50,7 @@ services:
       SPRING_FLYWAY_SCHEMAS: "auth"
       SPRING_FLYWAY_DEFAULT_SCHEMA: "auth"
       JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:5173}
     networks:
       - kuleana-net
 
@@ -62,6 +62,19 @@ services:
     container_name: kuleana-admin-ui
     ports:
       - "3000:80"
+    depends_on:
+      - auth-service
+    networks:
+      - kuleana-net
+
+  # Kuleana Assets Frontend (Vite / React / Nginx)
+  kule-assets:
+    build:
+      context: ../kuleana-frontend
+      dockerfile: docker/Dockerfile.assets
+    container_name: kuleana-assets-ui
+    ports:
+      - "3001:80"
     depends_on:
       - auth-service
     networks:

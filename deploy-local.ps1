@@ -76,6 +76,13 @@ if ($Status) {
     } catch {
         Write-Host "  kule-admin UI (3000):  OFFLINE / STARTING" -ForegroundColor Yellow
     }
+
+    try {
+        $assetsHealth = Invoke-WebRequest -Uri "http://localhost:3001" -TimeoutSec 3 -UseBasicParsing -ErrorAction SilentlyContinue
+        Write-Host "  kule-assets UI (3001): UP (HTTP $($assetsHealth.StatusCode))" -ForegroundColor Green
+    } catch {
+        Write-Host "  kule-assets UI (3001): OFFLINE / STARTING" -ForegroundColor Yellow
+    }
     Write-Host ""
     exit 0
 }
@@ -97,17 +104,36 @@ if (-not $NoBuild) {
 
     Write-Host "`n[2/2] Building Frontend Production Bundles (Vite)..." -ForegroundColor Yellow
     if (Test-Path $FrontendDir) {
-        Push-Location (Join-Path $FrontendDir "apps\kule-admin")
-        try {
-            npx vite build
-            if ($LASTEXITCODE -ne 0) {
-                Write-Error "[Kuleana] Frontend build failed! Aborting deployment."
-                exit 1
+        $adminDir = Join-Path $FrontendDir "apps\kule-admin"
+        if (Test-Path $adminDir) {
+            Write-Host "       Building kule-admin bundle..." -ForegroundColor Gray
+            Push-Location $adminDir
+            try {
+                npx vite build
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Error "[Kuleana] Frontend build for kule-admin failed! Aborting deployment."
+                    exit 1
+                }
+            } finally {
+                Pop-Location
             }
-        } finally {
-            Pop-Location
         }
-        Write-Host "       Frontend bundle built successfully." -ForegroundColor Green
+
+        $assetsDir = Join-Path $FrontendDir "apps\kule-assets"
+        if (Test-Path $assetsDir) {
+            Write-Host "       Building kule-assets bundle..." -ForegroundColor Gray
+            Push-Location $assetsDir
+            try {
+                npx vite build
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Error "[Kuleana] Frontend build for kule-assets failed! Aborting deployment."
+                    exit 1
+                }
+            } finally {
+                Pop-Location
+            }
+        }
+        Write-Host "       Frontend bundles built successfully." -ForegroundColor Green
     }
 } else {
     Write-Host "[Kuleana] Skipping build step (-NoBuild flag specified)." -ForegroundColor Gray
@@ -140,6 +166,7 @@ Write-Host "`n===============================================" -ForegroundColor 
 Write-Host "   Deployment Complete! All services running.   " -ForegroundColor Green
 Write-Host "===============================================" -ForegroundColor Green
 Write-Host "  • Kuleana Admin UI:      http://localhost:3000" -ForegroundColor Cyan
+Write-Host "  • Kuleana Assets UI:     http://localhost:3001" -ForegroundColor Cyan
 Write-Host "  • Auth Service API:      http://localhost:8081" -ForegroundColor Cyan
 Write-Host "  • Database Target:       Neon dev branch ($($env:DB_HOST))" -ForegroundColor Cyan
 Write-Host "  • Actuator Health:       http://localhost:8081/actuator/health" -ForegroundColor Cyan
