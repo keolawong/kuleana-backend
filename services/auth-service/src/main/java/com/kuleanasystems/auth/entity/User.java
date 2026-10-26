@@ -53,6 +53,20 @@ public class User {
     private Integer failedLoginAttempts = 0;
 
     @Builder.Default
+    @Column(name = "lockout_round", nullable = false)
+    private Integer lockoutRound = 0;
+
+    @Column(name = "account_locked_until")
+    private Instant accountLockedUntil;
+
+    @Builder.Default
+    @Column(name = "force_password_change", nullable = false)
+    private Boolean forcePasswordChange = false;
+
+    @Column(name = "password_reset_expires_at")
+    private Instant passwordResetExpiresAt;
+
+    @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",
