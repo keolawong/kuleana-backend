@@ -2,10 +2,10 @@
 .SYNOPSIS
     Kuleana Systems - Local Docker Deployment Script (PowerShell)
 .DESCRIPTION
-    Builds and deploys the Kuleana Systems ecosystem (auth-service, kule-admin UI, local postgres)
-    into local Docker containers.
+    Builds and deploys the Kuleana Systems ecosystem (auth-service, kule-admin UI)
+    targeting the Neon dev branch.
 .EXAMPLE
-    .\deploy-local.ps1            # Full build & deploy
+    .\deploy-local.ps1            # Full build & deploy (targets Neon dev branch)
     .\deploy-local.ps1 -NoBuild   # Spin up without recompiling
     .\deploy-local.ps1 -Down      # Stop and remove containers
     .\deploy-local.ps1 -Logs      # Stream container logs
@@ -18,7 +18,8 @@ param (
     [switch]$Logs,
     [switch]$Status,
     [switch]$NoBuild,
-    [string]$NeonDbUrl = ""
+    [switch]$LocalDb,
+    [string]$DbUrl = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,6 +28,20 @@ Set-Location $ScriptDir
 
 $ComposeFile = Join-Path $ScriptDir "docker-compose.yml"
 $FrontendDir = Join-Path (Split-Path -Parent $ScriptDir) "kuleana-frontend"
+$EnvFile = Join-Path $ScriptDir ".env"
+
+# Auto-load .env into environment
+if (Test-Path $EnvFile) {
+    Get-Content $EnvFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+            $parts = $line.Split("=", 2)
+            $k = $parts[0].Trim()
+            $v = $parts[1].Trim()
+            [System.Environment]::SetEnvironmentVariable($k, $v, "Process")
+        }
+    }
+}
 
 # --- TEARDOWN ---
 if ($Down -or $Stop) {
@@ -49,8 +64,8 @@ if ($Status) {
     docker compose -f $ComposeFile ps
     Write-Host "`nChecking health endpoints..." -ForegroundColor Gray
     try {
-        $backendHealth = Invoke-RestMethod -Uri "http://localhost:8081/actuator/health" -TimeoutSec 3 -ErrorAction SilentlyContinue
-        Write-Host "  auth-service (8081):   UP ($($backendHealth.status))" -ForegroundColor Green
+        $backendHealth = Invoke-RestMethod -Uri "http://localhost:8081/actuator/health" -TimeoutSec 4 -ErrorAction SilentlyContinue
+        Write-Host "  auth-service (8081):   UP ($($backendHealth.status)) [Database: $($backendHealth.components.db.details.database)]" -ForegroundColor Green
     } catch {
         Write-Host "  auth-service (8081):   OFFLINE / STARTING" -ForegroundColor Yellow
     }
@@ -68,10 +83,11 @@ if ($Status) {
 # --- BUILD STEP ---
 Write-Host "`n===============================================" -ForegroundColor Cyan
 Write-Host "   Kuleana Systems - Local Docker Deployer    " -ForegroundColor Cyan
+Write-Host "   Target: Neon PostgreSQL (dev branch)       " -ForegroundColor Cyan
 Write-Host "===============================================`n" -ForegroundColor Cyan
 
 if (-not $NoBuild) {
-    Write-Host "[1/3] Building Backend Executable JARs (Java 25)..." -ForegroundColor Yellow
+    Write-Host "[1/2] Building Backend Executable JARs (Java 25)..." -ForegroundColor Yellow
     & ".\gradlew.bat" :services:auth-service:bootJar -x test
     if ($LASTEXITCODE -ne 0) {
         Write-Error "[Kuleana] Backend build failed! Aborting deployment."
@@ -79,11 +95,11 @@ if (-not $NoBuild) {
     }
     Write-Host "       Backend JAR built successfully." -ForegroundColor Green
 
-    Write-Host "`n[2/3] Building Frontend Production Bundles (Vite)..." -ForegroundColor Yellow
+    Write-Host "`n[2/2] Building Frontend Production Bundles (Vite)..." -ForegroundColor Yellow
     if (Test-Path $FrontendDir) {
-        Push-Location $FrontendDir
+        Push-Location (Join-Path $FrontendDir "apps\kule-admin")
         try {
-            npx turbo run build
+            npx vite build
             if ($LASTEXITCODE -ne 0) {
                 Write-Error "[Kuleana] Frontend build failed! Aborting deployment."
                 exit 1
@@ -92,23 +108,28 @@ if (-not $NoBuild) {
             Pop-Location
         }
         Write-Host "       Frontend bundle built successfully." -ForegroundColor Green
-    } else {
-        Write-Warning "[Kuleana] Frontend directory not found at $FrontendDir, skipping frontend build."
     }
 } else {
     Write-Host "[Kuleana] Skipping build step (-NoBuild flag specified)." -ForegroundColor Gray
 }
 
 # --- DEPLOY STEP ---
-Write-Host "`n[3/3] Deploying Docker Containers..." -ForegroundColor Yellow
+Write-Host "`n[Deploy] Starting Docker Containers targeting Neon dev branch..." -ForegroundColor Yellow
 
-# Set DB_URL if provided
-if ($NeonDbUrl) {
-    $env:DB_URL = $NeonDbUrl
-    Write-Host "       Using external database: $NeonDbUrl" -ForegroundColor Cyan
+if ($DbUrl) {
+    $env:SPRING_DATASOURCE_URL = $DbUrl
+    $env:SPRING_FLYWAY_URL = $DbUrl
+    Write-Host "         Custom DB override: $DbUrl" -ForegroundColor Cyan
 }
 
-docker compose -f $ComposeFile up -d --build
+$composeArgs = @("-f", $ComposeFile)
+if ($LocalDb) {
+    $composeArgs += @("--profile", "local-db")
+    Write-Host "         Local Postgres container profile enabled." -ForegroundColor Yellow
+}
+$composeArgs += @("up", "-d", "--build")
+
+docker compose @composeArgs
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "[Kuleana] Docker compose up failed!"
@@ -120,8 +141,8 @@ Write-Host "   Deployment Complete! All services running.   " -ForegroundColor G
 Write-Host "===============================================" -ForegroundColor Green
 Write-Host "  • Kuleana Admin UI:      http://localhost:3000" -ForegroundColor Cyan
 Write-Host "  • Auth Service API:      http://localhost:8081" -ForegroundColor Cyan
+Write-Host "  • Database Target:       Neon dev branch ($($env:DB_HOST))" -ForegroundColor Cyan
 Write-Host "  • Actuator Health:       http://localhost:8081/actuator/health" -ForegroundColor Cyan
-Write-Host "  • Local Postgres:        localhost:5432 (db: kuleanadb, user: kuleana_user)" -ForegroundColor Cyan
 Write-Host "`nCommands:" -ForegroundColor Gray
 Write-Host "  .\deploy-local.ps1 -Logs    # View live logs"
 Write-Host "  .\deploy-local.ps1 -Status  # Health checks"

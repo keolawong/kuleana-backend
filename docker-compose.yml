@@ -1,12 +1,14 @@
 services:
-  # Local PostgreSQL 16 (for 100% offline development or zero-dependency local testing)
+  # Optional local PostgreSQL (only started if explicitly requested via --profile local-db)
   postgres:
     image: postgres:16-alpine
     container_name: kuleana-postgres
+    profiles:
+      - local-db
     environment:
-      POSTGRES_DB: kuleanadb
-      POSTGRES_USER: kuleana_user
-      POSTGRES_PASSWORD: kuleana_password
+      POSTGRES_DB: ${LOCAL_DB_NAME:-kuleanadb}
+      POSTGRES_USER: ${LOCAL_DB_USER:-kuleana_user}
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-kuleana_password}
     ports:
       - "5432:5432"
     volumes:
@@ -15,12 +17,12 @@ services:
     networks:
       - kuleana-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kuleana_user -d kuleanadb"]
+      test: ["CMD-SHELL", "pg_isready -U ${LOCAL_DB_USER:-kuleana_user} -d ${LOCAL_DB_NAME:-kuleanadb}"]
       interval: 4s
       timeout: 3s
       retries: 5
 
-  # Auth Service (Spring Boot 4 / Java 25)
+  # Auth Service (Spring Boot 4 / Java 25 - Targets Neon Dev Branch by default)
   auth-service:
     build:
       context: .
@@ -30,24 +32,25 @@ services:
     container_name: kuleana-auth-service
     ports:
       - "8081:8081"
+    env_file:
+      - .env
     environment:
-      DB_HOST: "postgres:5432"
-      DB_NAME: "kuleanadb"
-      DB_SSLMODE: "disable"
-      SPRING_DATASOURCE_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/kuleanadb?sslmode=disable&currentSchema=auth}
-      SPRING_DATASOURCE_USERNAME: ${DB_USER:-kuleana_user}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-kuleana_password}
-      SPRING_FLYWAY_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/kuleanadb?sslmode=disable&currentSchema=auth}
-      SPRING_FLYWAY_USER: ${DB_USER:-kuleana_user}
-      SPRING_FLYWAY_PASSWORD: ${DB_PASSWORD:-kuleana_password}
-      DB_APP_USER: ${DB_USER:-kuleana_user}
+      DB_HOST: ${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}
+      DB_NAME: ${DB_NAME:-neondb}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+      DB_MIGRATION_USER: ${DB_MIGRATION_USER:-neondb_owner}
+      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD}
+      DB_APP_USER: ${DB_APP_USER:-kahua_tracker_rwd}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD}
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}/${DB_NAME:-neondb}?sslmode=${DB_SSLMODE:-require}&currentSchema=auth}
+      SPRING_FLYWAY_URL: ${SPRING_FLYWAY_URL:-jdbc:postgresql://${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}/${DB_NAME:-neondb}?sslmode=${DB_SSLMODE:-require}&currentSchema=auth}
+      SPRING_FLYWAY_USER: ${DB_MIGRATION_USER:-neondb_owner}
+      SPRING_FLYWAY_PASSWORD: ${DB_MIGRATION_PASSWORD}
       SPRING_FLYWAY_ENABLED: "true"
       SPRING_FLYWAY_SCHEMAS: "auth"
       SPRING_FLYWAY_DEFAULT_SCHEMA: "auth"
       JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-    depends_on:
-      postgres:
-        condition: service_healthy
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173}
     networks:
       - kuleana-net
 
