@@ -1,3 +1,0 @@
-com.kuleanasystems.security.SecurityConfig
-com.kuleanasystems.security.JwtTokenProvider
-com.kuleanasystems.security.JwtAuthenticationFilter

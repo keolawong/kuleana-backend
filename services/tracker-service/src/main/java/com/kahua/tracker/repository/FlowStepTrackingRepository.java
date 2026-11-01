@@ -1,0 +1,16 @@
+package com.kahua.tracker.repository;
+
+import com.kahua.tracker.entity.FlowStepTracking;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.stereotype.Repository;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+
+@Repository
+public interface FlowStepTrackingRepository extends JpaRepository<FlowStepTracking, UUID>, JpaSpecificationExecutor<FlowStepTracking> {
+    List<FlowStepTracking> findByFlowTrackingIdIn(Collection<UUID> flowTrackingIds);
+}
+

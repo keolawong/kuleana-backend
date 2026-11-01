@@ -1,11 +1,39 @@
-plugins {
-    id 'org.springframework.boot'
-}
-
 dependencies {
-    implementation project(':shared:security-starter')
+    implementation 'org.apache.tomcat.embed:tomcat-embed-core:11.0.22'
+    implementation 'org.apache.tomcat.embed:tomcat-embed-el:11.0.22'
+    implementation 'org.apache.tomcat.embed:tomcat-embed-websocket:11.0.22'
+    implementation 'org.postgresql:postgresql:42.7.12'
+    implementation 'tools.jackson.core:jackson-databind:3.1.4'
+    implementation 'tools.jackson.core:jackson-core:3.1.4'
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.21.4'
+
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    implementation 'org.postgresql:postgresql:42.7.12'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'com.github.ben-manes.caffeine:caffeine'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'com.bucket4j:bucket4j-core:8.10.1'
+    implementation 'net.javacrumbs.shedlock:shedlock-spring:5.13.0'
+    implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:5.13.0'
+    implementation 'com.google.cloud:google-cloud-tasks:2.42.0'
+    compileOnly 'org.projectlombok:lombok'
+    runtimeOnly 'org.postgresql:postgresql:42.7.12'
+    annotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-flyway-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testCompileOnly 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testAnnotationProcessor 'org.projectlombok:lombok'
 }

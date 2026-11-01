@@ -22,62 +22,35 @@ services:
       timeout: 3s
       retries: 5
 
-  # Auth Service (Spring Boot 4 / Java 25 - Targets Neon Dev Branch by default)
-  auth-service:
+  # Tracker Service (Spring Boot 4 / Java 25 - Targets Neon Dev Branch tracker schema)
+  tracker-service:
     build:
       context: .
       dockerfile: docker/Dockerfile.service
       args:
-        SERVICE_NAME: auth-service
-    container_name: kuleana-auth-service
+        SERVICE_NAME: tracker-service
+    container_name: kuleana-tracker-service
     ports:
       - "8081:8081"
-    env_file:
-      - .env
     environment:
+      PORT: 8081
+      SERVER_PORT: 8081
       DB_HOST: ${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}
       DB_NAME: ${DB_NAME:-neondb}
       DB_SSLMODE: ${DB_SSLMODE:-require}
       DB_MIGRATION_USER: ${DB_MIGRATION_USER:-neondb_owner}
-      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD}
+      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:-npg_fc0e7qbFoQkW}
       DB_APP_USER: ${DB_APP_USER:-kahua_tracker_rwd}
-      DB_APP_PASSWORD: ${DB_APP_PASSWORD}
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}/${DB_NAME:-neondb}?sslmode=${DB_SSLMODE:-require}&currentSchema=auth}
-      SPRING_FLYWAY_URL: ${SPRING_FLYWAY_URL:-jdbc:postgresql://${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}/${DB_NAME:-neondb}?sslmode=${DB_SSLMODE:-require}&currentSchema=auth}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:-01S-0L1ph4nt5-crIt1c123-6lOtt1d34n-C4rr0t135t-pAn5p3rmy}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}/${DB_NAME:-neondb}?sslmode=${DB_SSLMODE:-require}&currentSchema=tracker
+      SPRING_FLYWAY_URL: jdbc:postgresql://${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}/${DB_NAME:-neondb}?sslmode=${DB_SSLMODE:-require}&currentSchema=tracker
       SPRING_FLYWAY_USER: ${DB_MIGRATION_USER:-neondb_owner}
-      SPRING_FLYWAY_PASSWORD: ${DB_MIGRATION_PASSWORD}
+      SPRING_FLYWAY_PASSWORD: ${DB_MIGRATION_PASSWORD:-npg_fc0e7qbFoQkW}
       SPRING_FLYWAY_ENABLED: "true"
-      SPRING_FLYWAY_SCHEMAS: "auth"
-      SPRING_FLYWAY_DEFAULT_SCHEMA: "auth"
-      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:5173}
-    networks:
-      - kuleana-net
-
-  # Kuleana Admin Frontend (Vite / React / Nginx)
-  kule-admin:
-    build:
-      context: ../kuleana-frontend
-      dockerfile: docker/Dockerfile.admin
-    container_name: kuleana-admin-ui
-    ports:
-      - "3000:80"
-    depends_on:
-      - auth-service
-    networks:
-      - kuleana-net
-
-  # Kuleana Assets Frontend (Vite / React / Nginx)
-  kule-assets:
-    build:
-      context: ../kuleana-frontend
-      dockerfile: docker/Dockerfile.assets
-    container_name: kuleana-assets-ui
-    ports:
-      - "3001:80"
-    depends_on:
-      - auth-service
-      - assets-service
+      SPRING_FLYWAY_SCHEMAS: "tracker"
+      SPRING_FLYWAY_DEFAULT_SCHEMA: "tracker"
+      APP_JWTSECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      SECURITY_CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8081,http://localhost:8082
     networks:
       - kuleana-net
 
@@ -91,25 +64,39 @@ services:
     container_name: kuleana-assets-service
     ports:
       - "8082:8082"
-    env_file:
-      - .env
     environment:
+      PORT: 8082
+      SERVER_PORT: 8082
       DB_HOST: ${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}
       DB_NAME: ${DB_NAME:-neondb}
       DB_SSLMODE: ${DB_SSLMODE:-require}
       DB_MIGRATION_USER: ${DB_MIGRATION_USER:-neondb_owner}
-      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD}
+      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:-npg_fc0e7qbFoQkW}
       DB_APP_USER: ${DB_ASSET_APP_USER:-kahua_asset_rwd}
-      DB_APP_PASSWORD: ${DB_ASSET_APP_PASSWORD}
+      DB_APP_PASSWORD: ${DB_ASSET_APP_PASSWORD:-cl0Dp0ll-f4nAt1c-pEr1k4ry0n-F05t3r3r-p1p1-v1tR41n}
       SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}/${DB_NAME:-neondb}?sslmode=${DB_SSLMODE:-require}&currentSchema=asset
       SPRING_FLYWAY_URL: jdbc:postgresql://${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}/${DB_NAME:-neondb}?sslmode=${DB_SSLMODE:-require}&currentSchema=asset
       SPRING_FLYWAY_USER: ${DB_MIGRATION_USER:-neondb_owner}
-      SPRING_FLYWAY_PASSWORD: ${DB_MIGRATION_PASSWORD}
+      SPRING_FLYWAY_PASSWORD: ${DB_MIGRATION_PASSWORD:-npg_fc0e7qbFoQkW}
       SPRING_FLYWAY_ENABLED: "true"
       SPRING_FLYWAY_SCHEMAS: "asset"
       SPRING_FLYWAY_DEFAULT_SCHEMA: "asset"
-      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:5173}
+      APP_JWTSECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      SECURITY_CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8081,http://localhost:8082
+    networks:
+      - kuleana-net
+
+  # Kuleana Assets Frontend (Vite / React / Nginx)
+  kule-assets:
+    build:
+      context: ../kuleana-frontend
+      dockerfile: docker/Dockerfile.assets
+    container_name: kuleana-assets-ui
+    ports:
+      - "3001:80"
+    depends_on:
+      - tracker-service
+      - assets-service
     networks:
       - kuleana-net
 

@@ -1,0 +1,11 @@
+-- V16: Ensure runtime application user has USAGE and table permissions on tracker and auth schemas
+GRANT USAGE ON SCHEMA tracker TO ${db_app_user};
+GRANT USAGE ON SCHEMA auth TO ${db_app_user};
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA tracker TO ${db_app_user};
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA auth TO ${db_app_user};
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA tracker TO ${db_app_user};
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA auth TO ${db_app_user};
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA tracker GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${db_app_user};
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${db_app_user};
