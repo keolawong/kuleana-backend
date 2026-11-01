@@ -52,7 +52,10 @@ services:
       APP_JWTSECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
       SECURITY_CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8081,http://localhost:8082
     networks:
-      - kuleana-net
+      kuleana-net:
+        aliases:
+          - tracker-service
+          - auth-service
 
   # Assets Service (Spring Boot 4 / Java 25 - Targets Neon Dev Branch asset schema)
   assets-service:
@@ -97,6 +100,19 @@ services:
     depends_on:
       - tracker-service
       - assets-service
+    networks:
+      - kuleana-net
+
+  # Kuleana Admin / Central Auth Frontend (Vite / React / Nginx)
+  kule-admin:
+    build:
+      context: ../kuleana-frontend
+      dockerfile: docker/Dockerfile.admin
+    container_name: kuleana-admin-ui
+    ports:
+      - "3000:80"
+    depends_on:
+      - tracker-service
     networks:
       - kuleana-net
 
