@@ -14,21 +14,23 @@ allprojects {
 }
 
 subprojects {
-    apply plugin: 'java'
-    apply plugin: 'org.springframework.boot'
-    apply plugin: 'io.spring.dependency-management'
+    if (project.childProjects.isEmpty()) {
+        apply plugin: 'java'
+        apply plugin: 'org.springframework.boot'
+        apply plugin: 'io.spring.dependency-management'
 
-    java {
-        toolchain {
-            languageVersion = JavaLanguageVersion.of(25)
+        java {
+            toolchain {
+                languageVersion = JavaLanguageVersion.of(25)
+            }
         }
-    }
 
-    springBoot {
-        buildInfo()
-    }
+        springBoot {
+            buildInfo()
+        }
 
-    tasks.withType(Test) {
-        useJUnitPlatform()
+        tasks.withType(Test) {
+            useJUnitPlatform()
+        }
     }
 }
