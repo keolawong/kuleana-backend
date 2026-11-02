@@ -71,7 +71,19 @@ public class UserController {
             List<UserApplication> scopedApps = userApplicationRepository.findAll().stream()
                     .filter(ua -> scopes.contains(ua.getAppName().toLowerCase()) && "active".equalsIgnoreCase(ua.getStatus()))
                     .collect(Collectors.toList());
-            Set<UUID> allowedUserIds = scopedApps.stream().map(UserApplication::getUserId).collect(Collectors.toSet());
+            Set<UUID> allowedUserIds = new HashSet<>(scopedApps.stream().map(UserApplication::getUserId).collect(Collectors.toSet()));
+
+            // Also check role-based fallback so un-backfilled users still match
+            List<UserRole> allRolesList = userRoleRepository.findAll();
+            for (UserRole ur : allRolesList) {
+                if (ur.getRole() != null) {
+                    String rName = ur.getRole().getName() != null ? ur.getRole().getName().toLowerCase() : "";
+                    boolean matches = scopes.stream().anyMatch(s -> rName.startsWith(s));
+                    if (matches) {
+                        allowedUserIds.add(ur.getUserId());
+                    }
+                }
+            }
             users = users.stream().filter(u -> allowedUserIds.contains(u.getId())).collect(Collectors.toList());
         }
         
@@ -372,13 +384,13 @@ public class UserController {
                         .build())
                 .collect(Collectors.toList());
 
-        List<UserResponse.ApplicationInfo> appInfos = userApps.stream()
+        List<UserResponse.ApplicationInfo> appInfos = new ArrayList<>(userApps.stream()
                 .map(ua -> UserResponse.ApplicationInfo.builder()
                         .appName(ua.getAppName())
                         .status(ua.getStatus())
                         .primaryRole(ua.getPrimaryRole())
                         .build())
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
 
         List<String> activeAppNames = userApps.stream()
                 .filter(ua -> "active".equalsIgnoreCase(ua.getStatus()))
@@ -398,6 +410,24 @@ public class UserController {
                 inferred.add("assets");
             }
             activeAppNames = new java.util.ArrayList<>(inferred);
+
+            for (String aName : activeAppNames) {
+                String primary = "DEFAULT";
+                if ("assets".equals(aName)) {
+                    primary = roleInfos.stream().anyMatch(r -> r.getName() != null && r.getName().toUpperCase().contains("LEAD")) ? "LEAD" :
+                              (roleInfos.stream().anyMatch(r -> r.getName() != null && r.getName().toUpperCase().contains("IT")) ? "IT" : "OPERATOR");
+                } else if ("tracker".equals(aName)) {
+                    primary = roleInfos.stream().anyMatch(r -> r.getName() != null && r.getName().equalsIgnoreCase("owner")) ? "OWNER" :
+                              (roleInfos.stream().anyMatch(r -> r.getName() != null && r.getName().equalsIgnoreCase("editor")) ? "EDITOR" : "VIEWER");
+                } else if ("admin".equals(aName)) {
+                    primary = "ADMIN";
+                }
+                appInfos.add(UserResponse.ApplicationInfo.builder()
+                        .appName(aName)
+                        .status("active")
+                        .primaryRole(primary)
+                        .build());
+            }
         }
 
         boolean isLocked = user.getAccountLockedUntil() != null && user.getAccountLockedUntil().isAfter(java.time.OffsetDateTime.now());
