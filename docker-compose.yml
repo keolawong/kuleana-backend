@@ -22,6 +22,38 @@ services:
       timeout: 3s
       retries: 5
 
+  # Auth / IAM Service (Spring Boot 4 / Java 25 - Targets Neon Dev Branch auth schema)
+  auth-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        SERVICE_NAME: auth-service
+    container_name: kuleana-auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      PORT: 8081
+      SERVER_PORT: 8081
+      DB_HOST: ${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}
+      DB_NAME: ${DB_NAME:-neondb}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+      DB_MIGRATION_USER: ${DB_MIGRATION_USER:-neondb_owner}
+      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:-npg_fc0e7qbFoQkW}
+      DB_APP_USER: ${DB_APP_USER:-kahua_tracker_rwd}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:-01S-0L1ph4nt5-crIt1c123-6lOtt1d34n-C4rr0t135t-pAn5p3rmy}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}/${DB_NAME:-neondb}?sslmode=${DB_SSLMODE:-require}&currentSchema=auth
+      SPRING_FLYWAY_URL: jdbc:postgresql://${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}/${DB_NAME:-neondb}?sslmode=${DB_SSLMODE:-require}&currentSchema=auth
+      SPRING_FLYWAY_USER: ${DB_MIGRATION_USER:-neondb_owner}
+      SPRING_FLYWAY_PASSWORD: ${DB_MIGRATION_PASSWORD:-npg_fc0e7qbFoQkW}
+      SPRING_FLYWAY_ENABLED: "false"
+      APP_JWTSECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      SECURITY_CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8081,http://localhost:8082,http://localhost:8083
+    networks:
+      kuleana-net:
+        aliases:
+          - auth-service
+
   # Tracker Service (Spring Boot 4 / Java 25 - Targets Neon Dev Branch tracker schema)
   tracker-service:
     build:
@@ -31,10 +63,10 @@ services:
         SERVICE_NAME: tracker-service
     container_name: kuleana-tracker-service
     ports:
-      - "8081:8081"
+      - "8083:8083"
     environment:
-      PORT: 8081
-      SERVER_PORT: 8081
+      PORT: 8083
+      SERVER_PORT: 8083
       DB_HOST: ${DB_HOST:-ep-jolly-sky-akn41zbq-pooler.c-3.us-west-2.aws.neon.tech}
       DB_NAME: ${DB_NAME:-neondb}
       DB_SSLMODE: ${DB_SSLMODE:-require}
@@ -50,12 +82,11 @@ services:
       SPRING_FLYWAY_SCHEMAS: "tracker"
       SPRING_FLYWAY_DEFAULT_SCHEMA: "tracker"
       APP_JWTSECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-      SECURITY_CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8081,http://localhost:8082
+      SECURITY_CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8081,http://localhost:8082,http://localhost:8083
     networks:
       kuleana-net:
         aliases:
           - tracker-service
-          - auth-service
 
   # Assets Service (Spring Boot 4 / Java 25 - Targets Neon Dev Branch asset schema)
   assets-service:
@@ -98,6 +129,7 @@ services:
     ports:
       - "3001:80"
     depends_on:
+      - auth-service
       - tracker-service
       - assets-service
     networks:
@@ -112,7 +144,7 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - tracker-service
+      - auth-service
     networks:
       - kuleana-net
 
