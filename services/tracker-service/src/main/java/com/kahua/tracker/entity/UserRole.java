@@ -7,7 +7,7 @@ import java.io.Serializable;
 import java.util.UUID;
 
 @Entity
-@Table(name = "user_roles", schema = "tracker")
+@Table(name = "user_roles", schema = "auth")
 @Getter
 @Setter
 @NoArgsConstructor

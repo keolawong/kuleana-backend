@@ -6,7 +6,7 @@ import lombok.*;
 import java.util.UUID;
 
 @Entity
-@Table(name = "permissions", schema = "tracker")
+@Table(name = "permissions", schema = "auth")
 @Getter
 @Setter
 @NoArgsConstructor

@@ -9,7 +9,7 @@ import java.util.UUID;
 import java.util.Set;
 
 @Entity
-@Table(name = "roles", schema = "tracker")
+@Table(name = "roles", schema = "auth")
 @Getter
 @Setter
 @NoArgsConstructor

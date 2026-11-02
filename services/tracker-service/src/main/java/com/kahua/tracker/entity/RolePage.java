@@ -10,7 +10,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "role_pages", schema = "tracker")
+@Table(name = "role_pages", schema = "auth")
 @Getter
 @Setter
 @NoArgsConstructor

@@ -9,7 +9,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "pages", schema = "tracker")
+@Table(name = "pages", schema = "auth")
 @Getter
 @Setter
 @NoArgsConstructor

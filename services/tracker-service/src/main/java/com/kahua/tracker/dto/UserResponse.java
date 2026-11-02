@@ -19,6 +19,8 @@ public class UserResponse {
     private Boolean locked;
     private OffsetDateTime createdAt;
     private List<RoleInfo> roles;
+    private List<ApplicationInfo> applications;
+    private List<String> apps;
 
     @Data
     @Builder
@@ -26,5 +28,13 @@ public class UserResponse {
         private UUID roleId;
         private String name;
         private String status;
+    }
+
+    @Data
+    @Builder
+    public static class ApplicationInfo {
+        private String appName;
+        private String status;
+        private String primaryRole;
     }
 }

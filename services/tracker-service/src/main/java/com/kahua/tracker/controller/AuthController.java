@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.Collections;
 
 @RestController
@@ -63,6 +65,12 @@ public class AuthController {
 
     @Autowired(required = false)
     private com.kahua.tracker.repository.UserRoleRepository userRoleRepository;
+
+    @Autowired(required = false)
+    private com.kahua.tracker.repository.RoleRepository roleRepository;
+
+    @Autowired(required = false)
+    private com.kahua.tracker.repository.UserApplicationRepository userApplicationRepository;
 
     @Autowired(required = false)
     private com.kahua.tracker.repository.RolePageRepository rolePageRepository;
@@ -123,6 +131,30 @@ public class AuthController {
             body.put("firstName", user.getFirstName());
             body.put("lastName", user.getLastName());
             body.put("forcePasswordChange", user.getForcePasswordChange());
+
+            List<String> apps = new ArrayList<>();
+            if (userApplicationRepository != null) {
+                apps = userApplicationRepository.findByUserId(user.getId()).stream()
+                        .filter(ua -> "active".equalsIgnoreCase(ua.getStatus()))
+                        .map(com.kahua.tracker.entity.UserApplication::getAppName)
+                        .collect(Collectors.toList());
+            }
+            if (apps.isEmpty() && roles != null) {
+                Set<String> inferred = new HashSet<>();
+                String[] roleArray = roles.split(",");
+                for (String r : roleArray) {
+                    String rLower = r.trim().toLowerCase();
+                    if (rLower.equals("role_admin") || rLower.equals("role_owner") || rLower.equals("admin") || rLower.equals("owner")) inferred.add("admin");
+                    if (rLower.contains("asset")) inferred.add("assets");
+                    if (rLower.contains("viewer") || rLower.contains("editor") || rLower.equals("owner") || rLower.equals("role_owner")) inferred.add("tracker");
+                }
+                if ("keolawong".equalsIgnoreCase(user.getUsername())) {
+                    inferred.add("admin");
+                    inferred.add("assets");
+                }
+                apps = new ArrayList<>(inferred);
+            }
+            body.put("apps", apps);
         }
 
         return ResponseEntity.ok()
@@ -164,6 +196,35 @@ public class AuthController {
         user.setSecurityQuestions(questions);
 
         userRepository.save(user);
+
+        // Automatically default sub-app entitlement for Kuleana Assets (Standard Operator)
+        if (userApplicationRepository != null) {
+            userApplicationRepository.save(com.kahua.tracker.entity.UserApplication.builder()
+                    .userId(user.getId())
+                    .appName("assets")
+                    .status("active")
+                    .primaryRole("OPERATOR")
+                    .build());
+        }
+
+        // Automatically default standard non-elevated roles for Kuleana Assets
+        if (userRoleRepository != null && roleRepository != null) {
+            List<String> defaultRoles = List.of("ASSET-READ", "ASSET-WRITE");
+            List<com.kahua.tracker.entity.UserRole> rolesList = new ArrayList<>();
+            for (String rName : defaultRoles) {
+                roleRepository.findByName(rName).ifPresent(role -> {
+                    rolesList.add(com.kahua.tracker.entity.UserRole.builder()
+                            .userId(user.getId())
+                            .roleId(role.getId())
+                            .status("active")
+                            .build());
+                });
+            }
+            if (!rolesList.isEmpty()) {
+                userRoleRepository.saveAll(rolesList);
+            }
+        }
+
         return ResponseEntity.ok("User registered successfully");
     }
     
@@ -409,6 +470,30 @@ public class AuthController {
         body.put("roles", roles);
         body.put("firstName", user.getFirstName());
         body.put("lastName", user.getLastName());
+
+        List<String> apps = new ArrayList<>();
+        if (userApplicationRepository != null) {
+            apps = userApplicationRepository.findByUserId(user.getId()).stream()
+                    .filter(ua -> "active".equalsIgnoreCase(ua.getStatus()))
+                    .map(com.kahua.tracker.entity.UserApplication::getAppName)
+                    .collect(Collectors.toList());
+        }
+        if (apps.isEmpty() && roles != null) {
+            Set<String> inferred = new HashSet<>();
+            String[] roleArray = roles.split(",");
+            for (String r : roleArray) {
+                String rLower = r.trim().toLowerCase();
+                if (rLower.equals("role_admin") || rLower.equals("role_owner") || rLower.equals("admin") || rLower.equals("owner")) inferred.add("admin");
+                if (rLower.contains("asset")) inferred.add("assets");
+                if (rLower.contains("viewer") || rLower.contains("editor") || rLower.equals("owner") || rLower.equals("role_owner")) inferred.add("tracker");
+            }
+            if ("keolawong".equalsIgnoreCase(user.getUsername())) {
+                inferred.add("admin");
+                inferred.add("assets");
+            }
+            apps = new ArrayList<>(inferred);
+        }
+        body.put("apps", apps);
         
         List<UserSecurityQuestion> userQuestions = userSecurityQuestionRepository.findByUserId(user.getId());
         List<String> questionTexts = userQuestions.stream()
