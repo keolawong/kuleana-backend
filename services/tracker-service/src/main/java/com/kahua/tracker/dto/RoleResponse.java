@@ -12,6 +12,7 @@ public class RoleResponse {
     private UUID id;
     private String name;
     private String description;
+    private String appName;
     private Boolean isActive;
     private OffsetDateTime createdAt;
 }

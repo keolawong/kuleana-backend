@@ -21,4 +21,20 @@ public class RoleSpecification {
         return (root, query, criteriaBuilder) -> 
             isActive == null ? null : criteriaBuilder.equal(root.get("isActive"), isActive);
     }
+
+    public static Specification<Role> hasAppName(String appName) {
+        return (root, query, criteriaBuilder) -> 
+            appName == null ? null : criteriaBuilder.equal(criteriaBuilder.lower(root.get("appName")), appName.toLowerCase());
+    }
+
+    public static Specification<Role> hasAppNameIn(java.util.Collection<String> appNames) {
+        return (root, query, criteriaBuilder) -> {
+            if (appNames == null || appNames.isEmpty()) return null;
+            var inClause = criteriaBuilder.in(criteriaBuilder.lower(root.get("appName")));
+            for (String app : appNames) {
+                inClause.value(app.toLowerCase());
+            }
+            return inClause;
+        };
+    }
 }

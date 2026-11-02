@@ -11,6 +11,7 @@ import com.kahua.tracker.repository.RoleRepository;
 import com.kahua.tracker.repository.UserApplicationRepository;
 import com.kahua.tracker.repository.UserRepository;
 import com.kahua.tracker.repository.UserRoleRepository;
+import com.kahua.tracker.service.AdminScopeService;
 import com.kahua.tracker.service.UserAuthCacheService;
 import com.kahua.tracker.spec.UserSpecification;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -18,13 +19,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -47,16 +45,35 @@ public class UserController {
     @Autowired
     private UserAuthCacheService userAuthCacheService;
 
+    @Autowired
+    private AdminScopeService adminScopeService;
+
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     @GetMapping
-    @PreAuthorize("hasAnyRole('VIEWER', 'ADMIN', 'OWNER', 'ASSET-IT')")
+    @PreAuthorize("hasAnyRole('SUPERADMIN', 'VIEWER', 'ADMIN', 'OWNER', 'ASSET-IT')")
     public ResponseEntity<List<UserResponse>> getUsers(
             @RequestParam(required = false) UUID id,
-            @RequestParam(required = false) String username) {
+            @RequestParam(required = false) String username,
+            Authentication authentication) {
         
         Specification<User> spec = Specification.where(UserSpecification.hasId(id))
                 .and(UserSpecification.hasUsername(username));
 
         List<User> users = userRepository.findAll(spec);
+
+        boolean isSuper = adminScopeService != null && adminScopeService.isSuperAdmin(authentication);
+        List<String> scopes = adminScopeService != null ? adminScopeService.getAdminScopes(authentication) : List.of();
+
+        if (!isSuper && !scopes.isEmpty()) {
+            // Sub-app admin: only return users who have active entitlement to their sub-app(s)
+            List<UserApplication> scopedApps = userApplicationRepository.findAll().stream()
+                    .filter(ua -> scopes.contains(ua.getAppName().toLowerCase()) && "active".equalsIgnoreCase(ua.getStatus()))
+                    .collect(Collectors.toList());
+            Set<UUID> allowedUserIds = scopedApps.stream().map(UserApplication::getUserId).collect(Collectors.toSet());
+            users = users.stream().filter(u -> allowedUserIds.contains(u.getId())).collect(Collectors.toList());
+        }
         
         List<UUID> userIds = users.stream().map(User::getId).collect(Collectors.toList());
         List<UserRole> allRoles = userIds.isEmpty() ? List.of() : userRoleRepository.findByUserIdIn(userIds);
@@ -78,33 +95,75 @@ public class UserController {
     }
 
     @PutMapping("/{userId}/applications")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'ASSET-IT')")
+    @PreAuthorize("hasAnyRole('SUPERADMIN', 'OWNER', 'ADMIN', 'ASSET-IT')")
     @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<?> updateUserApplications(
             @PathVariable UUID userId,
-            @RequestBody UserApplicationUpdateRequest request) {
+            @RequestBody UserApplicationUpdateRequest request,
+            Authentication authentication) {
 
         Optional<User> userOptional = userRepository.findById(userId);
         if (userOptional.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
+        boolean isSuper = adminScopeService != null && adminScopeService.isSuperAdmin(authentication);
+        List<String> scopes = adminScopeService != null ? adminScopeService.getAdminScopes(authentication) : List.of();
+
+        if (!isSuper && scopes.isEmpty()) {
+            return ResponseEntity.status(403).body("You do not have administrative authority to modify applications.");
+        }
+
+        List<UserApplication> existingApps = userApplicationRepository.findByUserId(userId);
+        List<UserApplication> preservedApps = new ArrayList<>();
+        if (!isSuper) {
+            for (UserApplication existing : existingApps) {
+                if (!scopes.contains(existing.getAppName().toLowerCase())) {
+                    preservedApps.add(existing);
+                }
+            }
+        }
+
         userApplicationRepository.deleteByUserId(userId);
 
-        if (request.getApplications() != null && !request.getApplications().isEmpty()) {
-            List<UserApplication> newApps = new ArrayList<>();
-            List<String> rolesToAssign = new ArrayList<>();
+        List<UserApplication> newApps = new ArrayList<>(preservedApps);
+        List<String> rolesToAssign = new ArrayList<>();
 
+        // If sub-app admin, preserve existing roles outside caller's scope
+        if (!isSuper) {
+            List<UserRole> existingRoles = userRoleRepository.findByUserId(userId);
+            for (UserRole ur : existingRoles) {
+                roleRepository.findById(ur.getRoleId()).ifPresent(r -> {
+                    String app = r.getAppName();
+                    if (app != null && !scopes.contains(app.toLowerCase())) {
+                        rolesToAssign.add(r.getName());
+                    } else if (app == null) {
+                        String name = r.getName().toLowerCase();
+                        boolean isMyScope = scopes.stream().anyMatch(s -> name.startsWith(s));
+                        if (!isMyScope && !name.contains("admin") && !name.contains("superadmin")) {
+                            rolesToAssign.add(r.getName());
+                        }
+                    }
+                });
+            }
+        }
+
+        if (request.getApplications() != null && !request.getApplications().isEmpty()) {
             for (var app : request.getApplications()) {
+                String appName = app.getAppName().toLowerCase();
+                if (!isSuper && !scopes.contains(appName)) {
+                    // Sub-app admin cannot modify apps outside their scope
+                    continue;
+                }
+
                 if ("active".equalsIgnoreCase(app.getStatus())) {
                     newApps.add(UserApplication.builder()
                             .userId(userId)
-                            .appName(app.getAppName().toLowerCase())
+                            .appName(appName)
                             .status("active")
                             .primaryRole(app.getPrimaryRole() != null ? app.getPrimaryRole().toUpperCase() : "DEFAULT")
                             .build());
 
-                    String appName = app.getAppName().toLowerCase();
                     String roleTier = app.getPrimaryRole() != null ? app.getPrimaryRole().toUpperCase() : "";
 
                     if ("assets".equals(appName)) {
@@ -116,11 +175,18 @@ public class UserController {
                             rolesToAssign.add("ASSET-IT");
                             rolesToAssign.add("ASSET-READ");
                             rolesToAssign.add("ASSET-WRITE");
+                        } else if ("ADMIN".equals(roleTier)) {
+                            rolesToAssign.add("ASSET-IT");
+                            rolesToAssign.add("ASSET-READ");
+                            rolesToAssign.add("ASSET-WRITE");
+                            if (isSuper) {
+                                rolesToAssign.add("admin");
+                            }
                         } else {
                             rolesToAssign.add("ASSET-READ");
                             rolesToAssign.add("ASSET-WRITE");
                         }
-                    } else if ("admin".equals(appName)) {
+                    } else if ("admin".equals(appName) && isSuper) {
                         rolesToAssign.add("admin");
                     } else if ("tracker".equals(appName)) {
                         if ("OWNER".equals(roleTier)) {
@@ -133,26 +199,26 @@ public class UserController {
                     }
                 }
             }
+        }
 
+        if (!newApps.isEmpty()) {
             userApplicationRepository.saveAll(newApps);
+        }
 
-            // Synchronize underlying user_roles
-            userRoleRepository.deleteByUserId(userId);
-            List<UserRole> newRoles = new ArrayList<>();
-            for (String rName : rolesToAssign.stream().distinct().toList()) {
-                roleRepository.findByName(rName).ifPresent(r -> {
-                    newRoles.add(UserRole.builder()
-                            .userId(userId)
-                            .roleId(r.getId())
-                            .status("active")
-                            .build());
-                });
-            }
-            if (!newRoles.isEmpty()) {
-                userRoleRepository.saveAll(newRoles);
-            }
-        } else {
-            userRoleRepository.deleteByUserId(userId);
+        // Synchronize underlying user_roles
+        userRoleRepository.deleteByUserId(userId);
+        List<UserRole> newRoles = new ArrayList<>();
+        for (String rName : rolesToAssign.stream().distinct().toList()) {
+            roleRepository.findByName(rName).ifPresent(r -> {
+                newRoles.add(UserRole.builder()
+                        .userId(userId)
+                        .roleId(r.getId())
+                        .status("active")
+                        .build());
+            });
+        }
+        if (!newRoles.isEmpty()) {
+            userRoleRepository.saveAll(newRoles);
         }
 
         userAuthCacheService.evictUser(userOptional.get().getUsername());
@@ -160,31 +226,65 @@ public class UserController {
     }
 
     @PutMapping("/{userId}/roles")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'ASSET-IT')")
+    @PreAuthorize("hasAnyRole('SUPERADMIN', 'OWNER', 'ADMIN', 'ASSET-IT')")
     @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<?> updateUserRoles(
             @PathVariable UUID userId,
-            @RequestBody UserRoleUpdateRequest request) {
+            @RequestBody UserRoleUpdateRequest request,
+            Authentication authentication) {
 
         Optional<User> userOptional = userRepository.findById(userId);
         if (userOptional.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
+        boolean isSuper = adminScopeService != null && adminScopeService.isSuperAdmin(authentication);
+        List<String> scopes = adminScopeService != null ? adminScopeService.getAdminScopes(authentication) : List.of();
+
+        if (!isSuper && scopes.isEmpty()) {
+            return ResponseEntity.status(403).body("You do not have administrative authority to modify roles.");
+        }
+
+        List<UserRole> existingRoles = userRoleRepository.findByUserId(userId);
+        List<UserRole> preservedRoles = new ArrayList<>();
+
+        if (!isSuper) {
+            for (UserRole ur : existingRoles) {
+                roleRepository.findById(ur.getRoleId()).ifPresent(r -> {
+                    String app = r.getAppName();
+                    if (app != null && !scopes.contains(app.toLowerCase())) {
+                        preservedRoles.add(ur);
+                    }
+                });
+            }
+        }
+
         userRoleRepository.deleteByUserId(userId);
 
+        List<UserRole> newRoles = new ArrayList<>(preservedRoles);
         if (request.getRoles() != null && !request.getRoles().isEmpty()) {
-            List<UserRole> newRoles = request.getRoles().stream().map(roleAssignment -> {
+            for (var roleAssignment : request.getRoles()) {
                 Role role = roleRepository.findById(roleAssignment.getRoleId())
                         .orElseThrow(() -> new IllegalArgumentException("Role not found: " + roleAssignment.getRoleId()));
 
-                return UserRole.builder()
+                if (!isSuper) {
+                    if (role.getAppName() != null && !scopes.contains(role.getAppName().toLowerCase())) {
+                        continue; // Cannot assign role outside scope
+                    }
+                    if (role.getName().equalsIgnoreCase("SUPERADMIN") || role.getName().equalsIgnoreCase("admin")) {
+                        continue; // Cannot assign superadmin or admin
+                    }
+                }
+
+                newRoles.add(UserRole.builder()
                         .userId(userId)
                         .roleId(roleAssignment.getRoleId())
-                        .status(roleAssignment.getStatus() != null ? roleAssignment.getStatus() : "inactive") 
-                        .build();
-            }).collect(Collectors.toList());
+                        .status(roleAssignment.getStatus() != null ? roleAssignment.getStatus() : "inactive")
+                        .build());
+            }
+        }
 
+        if (!newRoles.isEmpty()) {
             userRoleRepository.saveAll(newRoles);
         }
 
@@ -192,15 +292,24 @@ public class UserController {
         return ResponseEntity.ok("User roles updated successfully.");
     }
 
-    @Autowired
-    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
-
     @PostMapping("/{userId}/reset-password")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'ASSET-IT')")
-    public ResponseEntity<?> resetPassword(@PathVariable UUID userId, @RequestBody Map<String, String> request) {
+    @PreAuthorize("hasAnyRole('SUPERADMIN', 'OWNER', 'ADMIN', 'ASSET-IT')")
+    public ResponseEntity<?> resetPassword(@PathVariable UUID userId, @RequestBody Map<String, String> request, Authentication authentication) {
         Optional<User> userOptional = userRepository.findById(userId);
         if (userOptional.isEmpty()) {
             return ResponseEntity.notFound().build();
+        }
+
+        boolean isSuper = adminScopeService != null && adminScopeService.isSuperAdmin(authentication);
+        List<String> scopes = adminScopeService != null ? adminScopeService.getAdminScopes(authentication) : List.of();
+
+        if (!isSuper) {
+            // Verify target user belongs to sub-app admin's scope
+            List<UserApplication> userApps = userApplicationRepository.findByUserId(userId);
+            boolean belongsToScope = userApps.stream().anyMatch(ua -> scopes.contains(ua.getAppName().toLowerCase()));
+            if (!belongsToScope) {
+                return ResponseEntity.status(403).body(Map.of("message", "You cannot reset password for users outside your sub-app."));
+            }
         }
 
         User user = userOptional.get();
@@ -226,11 +335,22 @@ public class UserController {
     }
 
     @PostMapping("/{userId}/unlock")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'ASSET-IT')")
-    public ResponseEntity<?> unlockAccount(@PathVariable UUID userId) {
+    @PreAuthorize("hasAnyRole('SUPERADMIN', 'OWNER', 'ADMIN', 'ASSET-IT')")
+    public ResponseEntity<?> unlockAccount(@PathVariable UUID userId, Authentication authentication) {
         Optional<User> userOptional = userRepository.findById(userId);
         if (userOptional.isEmpty()) {
             return ResponseEntity.notFound().build();
+        }
+
+        boolean isSuper = adminScopeService != null && adminScopeService.isSuperAdmin(authentication);
+        List<String> scopes = adminScopeService != null ? adminScopeService.getAdminScopes(authentication) : List.of();
+
+        if (!isSuper) {
+            List<UserApplication> userApps = userApplicationRepository.findByUserId(userId);
+            boolean belongsToScope = userApps.stream().anyMatch(ua -> scopes.contains(ua.getAppName().toLowerCase()));
+            if (!belongsToScope) {
+                return ResponseEntity.status(403).body("You cannot unlock accounts for users outside your sub-app.");
+            }
         }
 
         User user = userOptional.get();
@@ -269,7 +389,7 @@ public class UserController {
             java.util.Set<String> inferred = new java.util.HashSet<>();
             for (UserResponse.RoleInfo r : roleInfos) {
                 String rName = r.getName() != null ? r.getName().toLowerCase() : "";
-                if (rName.equals("admin") || rName.equals("owner")) inferred.add("admin");
+                if (rName.equals("admin") || rName.equals("superadmin") || rName.equals("owner")) inferred.add("admin");
                 if (rName.startsWith("asset")) inferred.add("assets");
                 if (rName.equals("viewer") || rName.equals("editor") || rName.equals("owner")) inferred.add("tracker");
             }

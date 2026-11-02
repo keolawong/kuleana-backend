@@ -31,6 +31,9 @@ public class Role {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "app_name", length = 50)
+    private String appName;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;

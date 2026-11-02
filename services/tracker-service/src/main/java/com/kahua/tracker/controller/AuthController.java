@@ -75,6 +75,9 @@ public class AuthController {
     @Autowired(required = false)
     private com.kahua.tracker.repository.RolePageRepository rolePageRepository;
 
+    @Autowired(required = false)
+    private com.kahua.tracker.service.AdminScopeService adminScopeService;
+
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
         User user = userRepository.findByUsername(loginRequest.getUsername()).orElse(null);
@@ -155,6 +158,20 @@ public class AuthController {
                 apps = new ArrayList<>(inferred);
             }
             body.put("apps", apps);
+            boolean isSuper = adminScopeService != null && adminScopeService.isSuperAdmin(authentication);
+            List<String> adminScopes = adminScopeService != null ? adminScopeService.getAdminScopes(authentication) : List.of();
+            body.put("isSuperAdmin", isSuper);
+            body.put("adminScopes", adminScopes);
+            if (userApplicationRepository != null) {
+                List<Map<String, Object>> appDetails = userApplicationRepository.findByUserId(user.getId()).stream()
+                        .map(ua -> Map.<String, Object>of(
+                                "appName", ua.getAppName(),
+                                "status", ua.getStatus(),
+                                "primaryRole", ua.getPrimaryRole() != null ? ua.getPrimaryRole() : ""
+                        ))
+                        .collect(Collectors.toList());
+                body.put("applicationDetails", appDetails);
+            }
         }
 
         return ResponseEntity.ok()
@@ -207,9 +224,18 @@ public class AuthController {
                     .build());
         }
 
-        // Automatically default standard non-elevated roles for Kuleana Assets
+        if (userApplicationRepository != null) {
+            userApplicationRepository.save(com.kahua.tracker.entity.UserApplication.builder()
+                    .userId(user.getId())
+                    .appName("tracker")
+                    .status("active")
+                    .primaryRole("VIEWER")
+                    .build());
+        }
+
+        // Automatically default standard non-elevated roles for Kuleana Assets & Tracker
         if (userRoleRepository != null && roleRepository != null) {
-            List<String> defaultRoles = List.of("ASSET-READ", "ASSET-WRITE");
+            List<String> defaultRoles = List.of("ASSET-READ", "ASSET-WRITE", "viewer");
             List<com.kahua.tracker.entity.UserRole> rolesList = new ArrayList<>();
             for (String rName : defaultRoles) {
                 roleRepository.findByName(rName).ifPresent(role -> {
@@ -500,6 +526,20 @@ public class AuthController {
                 .map(UserSecurityQuestion::getQuestion)
                 .collect(Collectors.toList());
         body.put("securityQuestions", questionTexts);
+        boolean isSuperMe = adminScopeService != null && adminScopeService.isSuperAdmin(authentication);
+        List<String> adminScopesMe = adminScopeService != null ? adminScopeService.getAdminScopes(authentication) : List.of();
+        body.put("isSuperAdmin", isSuperMe);
+        body.put("adminScopes", adminScopesMe);
+        if (userApplicationRepository != null) {
+            List<Map<String, Object>> appDetails = userApplicationRepository.findByUserId(user.getId()).stream()
+                    .map(ua -> Map.<String, Object>of(
+                            "appName", ua.getAppName(),
+                            "status", ua.getStatus(),
+                            "primaryRole", ua.getPrimaryRole() != null ? ua.getPrimaryRole() : ""
+                    ))
+                    .collect(Collectors.toList());
+            body.put("applicationDetails", appDetails);
+        }
         
         return ResponseEntity.ok(body);
     }

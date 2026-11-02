@@ -31,6 +31,7 @@ public class RoleService {
 
         request.getName().ifPresent(roleToUpdate::setName);
         request.getDescription().ifPresent(roleToUpdate::setDescription);
+        request.getAppName().ifPresent(roleToUpdate::setAppName);
         request.getIsActive().ifPresent(roleToUpdate::setIsActive);
 
         return Optional.of(roleRepository.save(roleToUpdate));

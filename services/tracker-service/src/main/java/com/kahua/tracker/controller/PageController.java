@@ -27,7 +27,7 @@ public class PageController {
     private final PageRepository pageRepository;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('VIEWER', 'ADMIN', 'OWNER', 'ASSET-IT')")
+    @PreAuthorize("hasAnyRole('SUPERADMIN', 'VIEWER', 'ADMIN', 'OWNER', 'ASSET-IT')")
     public ResponseEntity<List<PageResponse>> getPages(
             @RequestParam(required = false) UUID id,
             @RequestParam(required = false) String path,
@@ -57,7 +57,7 @@ public class PageController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'ASSET-IT')")
+    @PreAuthorize("hasAnyRole('SUPERADMIN', 'OWNER', 'ADMIN', 'ASSET-IT')")
     public ResponseEntity<?> createPage(@RequestBody PageCreateRequest request) {
         if (request.getPath() == null || request.getName() == null) {
             return ResponseEntity.badRequest().body("Path and Name are required.");
