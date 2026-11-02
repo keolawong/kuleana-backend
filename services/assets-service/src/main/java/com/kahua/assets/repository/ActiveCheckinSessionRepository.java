@@ -14,7 +14,10 @@ import java.util.UUID;
 public interface ActiveCheckinSessionRepository extends JpaRepository<ActiveCheckinSession, UUID> {
 
     @EntityGraph(attributePaths = {"gate", "shift"})
-    Optional<ActiveCheckinSession> findByUsername(String username);
+    List<ActiveCheckinSession> findByUsername(String username);
+
+    @EntityGraph(attributePaths = {"gate", "shift"})
+    Optional<ActiveCheckinSession> findTopByUsernameOrderByCreatedAtDesc(String username);
 
     @EntityGraph(attributePaths = {"gate", "shift"})
     List<ActiveCheckinSession> findByStatusAndLastHeartbeatAtAfterOrderByLastHeartbeatAtDesc(String status, Instant threshold);

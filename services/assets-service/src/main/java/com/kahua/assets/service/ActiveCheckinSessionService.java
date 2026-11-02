@@ -42,12 +42,19 @@ public class ActiveCheckinSessionService {
         Shift shift = shiftRepository.findById(dto.getShiftId())
                 .orElseThrow(() -> new EntityNotFoundException("Shift not found with id: " + dto.getShiftId()));
 
-        ActiveCheckinSession session = activeCheckinSessionRepository.findByUsername(dto.getUsername())
-                .orElseGet(() -> {
-                    ActiveCheckinSession s = new ActiveCheckinSession();
-                    s.setUsername(dto.getUsername());
-                    return s;
-                });
+        List<ActiveCheckinSession> existingSessions = activeCheckinSessionRepository.findByUsername(dto.getUsername());
+        ActiveCheckinSession session;
+        if (!existingSessions.isEmpty()) {
+            session = existingSessions.get(0);
+            if (existingSessions.size() > 1) {
+                for (int i = 1; i < existingSessions.size(); i++) {
+                    activeCheckinSessionRepository.delete(existingSessions.get(i));
+                }
+            }
+        } else {
+            session = new ActiveCheckinSession();
+            session.setUsername(dto.getUsername());
+        }
 
         session.setGate(gate);
         session.setShift(shift);
@@ -72,11 +79,12 @@ public class ActiveCheckinSessionService {
         if (username == null || username.isBlank()) {
             return;
         }
-        activeCheckinSessionRepository.findByUsername(username).ifPresent(session -> {
+        List<ActiveCheckinSession> sessions = activeCheckinSessionRepository.findByUsername(username);
+        for (ActiveCheckinSession session : sessions) {
             session.setStatus("INACTIVE");
             session.setLastHeartbeatAt(Instant.now());
             activeCheckinSessionRepository.save(session);
-        });
+        }
     }
 
     public ActiveCheckinSessionDto toDto(ActiveCheckinSession session) {

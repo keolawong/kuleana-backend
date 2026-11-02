@@ -72,7 +72,7 @@ class ActiveCheckinSessionServiceTest {
 
         when(gateRepository.findById(gateId)).thenReturn(Optional.of(gate));
         when(shiftRepository.findById(shiftId)).thenReturn(Optional.of(shift));
-        when(activeCheckinSessionRepository.findByUsername("jsmith")).thenReturn(Optional.empty());
+        when(activeCheckinSessionRepository.findByUsername("jsmith")).thenReturn(java.util.Collections.emptyList());
 
         UUID generatedId = UUID.randomUUID();
         when(activeCheckinSessionRepository.save(any(ActiveCheckinSession.class))).thenAnswer(invocation -> {
@@ -122,7 +122,7 @@ class ActiveCheckinSessionServiceTest {
 
         when(gateRepository.findById(gateId)).thenReturn(Optional.of(gate));
         when(shiftRepository.findById(shiftId)).thenReturn(Optional.of(shift));
-        when(activeCheckinSessionRepository.findByUsername("jsmith")).thenReturn(Optional.of(existing));
+        when(activeCheckinSessionRepository.findByUsername("jsmith")).thenReturn(List.of(existing));
         when(activeCheckinSessionRepository.save(existing)).thenReturn(existing);
 
         ActiveCheckinSessionDto result = activeCheckinSessionService.recordHeartbeat(requestDto);
@@ -237,7 +237,7 @@ class ActiveCheckinSessionServiceTest {
                 .status("ACTIVE")
                 .build();
 
-        when(activeCheckinSessionRepository.findByUsername("jsmith")).thenReturn(Optional.of(session));
+        when(activeCheckinSessionRepository.findByUsername("jsmith")).thenReturn(List.of(session));
 
         activeCheckinSessionService.closeSession("jsmith");
 
@@ -248,7 +248,7 @@ class ActiveCheckinSessionServiceTest {
 
     @Test
     void closeSession_WhenSessionNotFound_DoesNothing() {
-        when(activeCheckinSessionRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+        when(activeCheckinSessionRepository.findByUsername("unknown")).thenReturn(java.util.Collections.emptyList());
 
         activeCheckinSessionService.closeSession("unknown");
 
