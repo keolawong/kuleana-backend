@@ -7,12 +7,16 @@ import com.kuleanasystems.auth.entity.User;
 import com.kuleanasystems.auth.entity.UserApplication;
 import com.kuleanasystems.auth.entity.UserRole;
 import com.kuleanasystems.auth.entity.UserSecurityQuestion;
+import com.kuleanasystems.auth.entity.Organization;
+import com.kuleanasystems.auth.entity.UserOrganization;
 import com.kuleanasystems.auth.repository.RolePageRepository;
 import com.kuleanasystems.auth.repository.RoleRepository;
 import com.kuleanasystems.auth.repository.UserApplicationRepository;
 import com.kuleanasystems.auth.repository.UserRepository;
 import com.kuleanasystems.auth.repository.UserRoleRepository;
 import com.kuleanasystems.auth.repository.UserSecurityQuestionRepository;
+import com.kuleanasystems.auth.repository.OrganizationRepository;
+import com.kuleanasystems.auth.repository.UserOrganizationRepository;
 import com.kuleanasystems.auth.service.AdminScopeService;
 import com.kuleanasystems.auth.service.AuthService;
 import com.kuleanasystems.auth.service.PasswordValidator;
@@ -83,6 +87,12 @@ public class AuthController {
     private RolePageRepository rolePageRepository;
 
     @Autowired(required = false)
+    private UserOrganizationRepository userOrganizationRepository;
+
+    @Autowired(required = false)
+    private OrganizationRepository organizationRepository;
+
+    @Autowired(required = false)
     private AdminScopeService adminScopeService;
 
     @PostMapping("/login")
@@ -118,8 +128,17 @@ public class AuthController {
             authService.handleSuccessfulLogin(loginRequest.getUsername());
         }
 
+        List<Map<String, Object>> orgs = Collections.emptyList();
+        UUID activeOrgId = null;
+        if (user != null) {
+            orgs = getUserOrganizations(user.getId());
+            if (!orgs.isEmpty()) {
+                activeOrgId = (UUID) orgs.get(0).get("id");
+            }
+        }
+
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = tokenProvider.generateToken(authentication);
+        String jwt = tokenProvider.generateToken(authentication, activeOrgId != null ? activeOrgId.toString() : null);
 
         ResponseCookie cookie = ResponseCookie.from("jwt", jwt)
                 .httpOnly(true)
@@ -179,6 +198,8 @@ public class AuthController {
                         .collect(Collectors.toList());
                 body.put("applicationDetails", appDetails);
             }
+            body.put("organizations", orgs);
+            body.put("activeOrgId", activeOrgId != null ? activeOrgId.toString() : null);
         }
 
         return ResponseEntity.ok()
@@ -554,7 +575,39 @@ public class AuthController {
             body.put("applicationDetails", appDetails);
         }
 
+        List<Map<String, Object>> orgs = getUserOrganizations(user.getId());
+        UUID activeOrgId = !orgs.isEmpty() ? (UUID) orgs.get(0).get("id") : null;
+        body.put("organizations", orgs);
+        body.put("activeOrgId", activeOrgId != null ? activeOrgId.toString() : null);
+
         return ResponseEntity.ok(body);
+    }
+
+    private List<Map<String, Object>> getUserOrganizations(UUID userId) {
+        if (userOrganizationRepository == null || organizationRepository == null || userId == null) {
+            return Collections.emptyList();
+        }
+        List<UserOrganization> userOrgs = userOrganizationRepository.findByUserId(userId);
+        if (userOrgs.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<UUID> orgIds = userOrgs.stream().map(UserOrganization::getOrgId).collect(Collectors.toList());
+        Map<UUID, Organization> orgMap = organizationRepository.findAllById(orgIds).stream()
+                .collect(Collectors.toMap(Organization::getId, o -> o));
+
+        return userOrgs.stream()
+                .map(uo -> {
+                    Organization org = orgMap.get(uo.getOrgId());
+                    if (org == null) return null;
+                    Map<String, Object> map = new LinkedHashMap<>();
+                    map.put("id", org.getId());
+                    map.put("slug", org.getSlug());
+                    map.put("name", org.getName());
+                    map.put("role", uo.getRole());
+                    return map;
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/profile")

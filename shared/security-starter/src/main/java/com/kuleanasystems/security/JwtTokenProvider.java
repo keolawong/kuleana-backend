@@ -29,25 +29,38 @@ public class JwtTokenProvider {
     }
 
     public String generateToken(Authentication authentication) {
+        return generateToken(authentication, (String) null);
+    }
+
+    public String generateToken(Authentication authentication, String activeOrgId) {
         String username = authentication.getName();
         String roles = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.joining(","));
 
-        return generateToken(username, roles);
+        return generateToken(username, roles, activeOrgId);
     }
 
     public String generateToken(String username, String roles) {
+        return generateToken(username, roles, (String) null);
+    }
+
+    public String generateToken(String username, String roles, String activeOrgId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
-        return Jwts.builder()
+        JwtBuilder builder = Jwts.builder()
                 .setSubject(username)
                 .claim("roles", roles != null ? roles : "")
                 .setIssuedAt(now)
-                .setExpiration(expiryDate)
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
+                .setExpiration(expiryDate);
+
+        if (activeOrgId != null && !activeOrgId.trim().isEmpty()) {
+            builder.claim("activeOrgId", activeOrgId.trim());
+            builder.claim("orgId", activeOrgId.trim());
+        }
+
+        return builder.signWith(key, SignatureAlgorithm.HS256).compact();
     }
 
     public String getUsernameFromJwtToken(String token) {
@@ -56,6 +69,15 @@ public class JwtTokenProvider {
 
     public String getRolesFromJwtToken(String token) {
         return getClaimsFromJwtToken(token).get("roles", String.class);
+    }
+
+    public String getActiveOrgIdFromJwtToken(String token) {
+        Claims claims = getClaimsFromJwtToken(token);
+        String orgId = claims.get("activeOrgId", String.class);
+        if (orgId == null) {
+            orgId = claims.get("orgId", String.class);
+        }
+        return orgId;
     }
 
     public Claims getClaimsFromJwtToken(String token) {

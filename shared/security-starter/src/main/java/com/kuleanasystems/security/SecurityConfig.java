@@ -38,9 +38,9 @@ public class SecurityConfig {
 
     @Bean
     @ConditionalOnMissingBean(SecurityFilterChain.class)
-    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http, CorsConfigurationSource corsConfigurationSource) throws Exception {
         http
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .cors(cors -> cors.configurationSource(corsConfigurationSource))
             .csrf(csrf -> csrf.disable())
             .headers(headers -> headers
                 .frameOptions(frameOptions -> frameOptions.deny())
