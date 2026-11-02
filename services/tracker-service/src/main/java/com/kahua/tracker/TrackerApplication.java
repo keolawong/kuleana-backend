@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = {"com.kahua.tracker", "com.kuleanasystems.security"})
 @SecurityScheme(
         name = "bearerAuth",
         description = "JWT auth description",

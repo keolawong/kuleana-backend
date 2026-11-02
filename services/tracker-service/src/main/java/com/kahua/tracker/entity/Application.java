@@ -47,12 +47,4 @@ public class Application {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "write_role_id", insertable = false, updatable = false)
-    private Role writeRole;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "read_role_id", insertable = false, updatable = false)
-    private Role readRole;
 }

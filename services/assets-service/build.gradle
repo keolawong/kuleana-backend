@@ -1,4 +1,6 @@
 dependencies {
+    implementation project(':shared:security-starter')
+
     implementation 'org.apache.tomcat.embed:tomcat-embed-core:11.0.22'
     implementation 'org.apache.tomcat.embed:tomcat-embed-el:11.0.22'
     implementation 'org.apache.tomcat.embed:tomcat-embed-websocket:11.0.22'

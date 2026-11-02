@@ -1,4 +1,6 @@
 rootProject.name = 'kuleana-backend'
 
-include 'services:assets-service'
+include 'shared:security-starter'
+include 'services:auth-service'
 include 'services:tracker-service'
+include 'services:assets-service'

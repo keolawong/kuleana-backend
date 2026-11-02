@@ -1,0 +1,70 @@
+server:
+  port: ${PORT:8081}
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: auth
+
+  # 1. Spring Data JPA Core (Uses runtime user)
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}/${DB_NAME:neondb}?sslmode=require&currentSchema=auth
+    username: ${DB_APP_USER:kahua_tracker_rwd}
+    password: ${DB_APP_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  # 2. Flyway Schema Migrator (Overrides connection to use owner)
+  flyway:
+    enabled: true
+    url: jdbc:postgresql://${DB_HOST}/${DB_NAME:neondb}?sslmode=require
+    user: ${DB_MIGRATION_USER:neondb_owner}
+    password: ${DB_MIGRATION_PASSWORD}
+    schemas: auth
+    create-schemas: true
+    baseline-on-migrate: true
+    validate-on-migrate: false
+    placeholders:
+      db_app_user: ${DB_APP_USER:kahua_tracker_rwd}
+
+  # 3. Hibernate Configuration
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        default_schema: auth
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  logging:
+    level:
+      com.zaxxer.hikari: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,prometheus,metrics"
+  info:
+    env:
+      enabled: true
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name},%X{traceId:-},%X{spanId:-}]"
+
+app:
+  jwtSecret: ${APP_JWTSECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  jwtExpirationMs: ${APP_JWT_EXPIRATION_MS:86400000}
+
+security:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:4173,http://127.0.0.1:4173,https://test.assets.kahua.com,https://*.web.app,https://*.firebaseapp.com}
+  rate-limit:
+    auth-per-minute: ${RATE_LIMIT_AUTH_PER_MIN:9999}
