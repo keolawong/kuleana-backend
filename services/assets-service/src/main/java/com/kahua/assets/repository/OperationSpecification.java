@@ -14,7 +14,7 @@ import java.util.UUID;
 public class OperationSpecification {
 
     public static Specification<Operation> search(
-            UUID operationId, String name, LocalDate startDate, LocalDate endDate,
+            UUID operationId, UUID orgId, String name, LocalDate startDate, LocalDate endDate,
             String locationName, Boolean isActive, BigDecimal ticketPrice, BigDecimal ccFee,
             String ccFeeType, String createdBy, Instant createdAt, String updatedBy, Instant updatedAt) {
 
@@ -23,6 +23,9 @@ public class OperationSpecification {
 
             if (operationId != null) {
                 predicates.add(cb.equal(root.get("operationId"), operationId));
+            }
+            if (orgId != null) {
+                predicates.add(cb.equal(root.get("orgId"), orgId));
             }
             if (name != null && !name.trim().isEmpty()) {
                 predicates.add(cb.like(cb.lower(root.get("name")), "%" + name.toLowerCase() + "%"));

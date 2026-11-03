@@ -9,12 +9,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 @Data
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class OperationPatchDto {
+    private UUID orgId;
     private String name;
     private LocalDate startDate;
     private LocalDate endDate;
@@ -26,6 +28,11 @@ public class OperationPatchDto {
 
     @JsonIgnore
     private final Set<String> dirtyFields = new HashSet<>();
+
+    public void setOrgId(UUID orgId) {
+        this.orgId = orgId;
+        this.dirtyFields.add("orgId");
+    }
 
     public void setName(String name) {
         this.name = name;

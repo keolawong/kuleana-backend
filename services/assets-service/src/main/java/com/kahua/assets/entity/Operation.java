@@ -21,6 +21,9 @@ public class Operation {
     @Column(name = "operation_id", nullable = false)
     private UUID operationId;
 
+    @Column(name = "org_id")
+    private UUID orgId;
+
     @Column(name = "name", nullable = false)
     private String name;
 

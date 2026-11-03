@@ -21,6 +21,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OperationService {
 
+    private static final UUID DEFAULT_ORG_ID = UUID.fromString("a0000000-0000-0000-0000-000000000001");
+
     private final OperationRepository operationRepository;
 
     @Transactional
@@ -30,7 +32,13 @@ public class OperationService {
         operation.setStartDate(dto.getStartDate());
         operation.setEndDate(dto.getEndDate());
         operation.setLocationName(dto.getLocationName());
-        
+
+        if (dto.getOrgId() != null) {
+            operation.setOrgId(dto.getOrgId());
+        } else {
+            operation.setOrgId(DEFAULT_ORG_ID);
+        }
+
         if (dto.getIsActive() != null) {
             operation.setIsActive(dto.getIsActive());
         }
@@ -56,6 +64,9 @@ public class OperationService {
         Operation operation = operationRepository.findById(operationId)
                 .orElseThrow(() -> new EntityNotFoundException("Operation not found with id: " + operationId));
 
+        if (dto.isDirty("orgId") && dto.getOrgId() != null) {
+            operation.setOrgId(dto.getOrgId());
+        }
         if (dto.isDirty("name")) {
             operation.setName(dto.getName());
         }
@@ -90,11 +101,11 @@ public class OperationService {
 
     @Transactional(readOnly = true)
     public List<Operation> searchOperations(
-            UUID operationId, String name, LocalDate startDate, LocalDate endDate,
+            UUID operationId, UUID orgId, String name, LocalDate startDate, LocalDate endDate,
             String locationName, Boolean isActive, BigDecimal ticketPrice, BigDecimal ccFee,
             String ccFeeType, String createdBy, Instant createdAt, String updatedBy, Instant updatedAt) {
         Specification<Operation> spec = OperationSpecification.search(
-                operationId, name, startDate, endDate, locationName,
+                operationId, orgId, name, startDate, endDate, locationName,
                 isActive, ticketPrice, ccFee, ccFeeType, createdBy, createdAt, updatedBy, updatedAt);
         return operationRepository.findAll(spec);
     }

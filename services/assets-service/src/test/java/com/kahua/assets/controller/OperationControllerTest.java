@@ -87,7 +87,7 @@ class OperationControllerTest {
 
     @Test
     void getOperations_shouldReturn200() throws Exception {
-        when(operationService.searchOperations(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(operationService.searchOperations(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of(mockOperation));
 
         mockMvc.perform(get("/api/operations")
@@ -98,7 +98,7 @@ class OperationControllerTest {
 
     @Test
     void getOperations_shouldReturn204IfEmpty() throws Exception {
-        when(operationService.searchOperations(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(operationService.searchOperations(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/operations"))

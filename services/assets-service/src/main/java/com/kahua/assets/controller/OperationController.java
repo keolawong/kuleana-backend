@@ -8,6 +8,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -25,7 +28,15 @@ public class OperationController {
     private final OperationService operationService;
 
     @PostMapping
-    public ResponseEntity<Operation> createOperation(@Valid @RequestBody OperationDto operationDto) {
+    public ResponseEntity<Operation> createOperation(
+            @Valid @RequestBody OperationDto operationDto,
+            @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader) {
+        if (operationDto.getOrgId() == null && orgIdHeader != null && !orgIdHeader.trim().isEmpty()) {
+            try {
+                operationDto.setOrgId(UUID.fromString(orgIdHeader.trim()));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
         Operation createdOperation = operationService.createOperation(operationDto);
         return ResponseEntity.created(URI.create("/api/operations/" + createdOperation.getOperationId())).body(createdOperation);
     }
@@ -38,6 +49,8 @@ public class OperationController {
 
     @GetMapping
     public ResponseEntity<List<Operation>> getOperations(
+            @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader,
+            @RequestParam(required = false) UUID orgId,
             @RequestParam(required = false) UUID operationId,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) LocalDate startDate,
@@ -52,8 +65,30 @@ public class OperationController {
             @RequestParam(required = false) String updatedBy,
             @RequestParam(required = false) Instant updatedAt) {
 
+        boolean isSuperAdmin = false;
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getAuthorities() != null) {
+            isSuperAdmin = authentication.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .anyMatch(a -> "ROLE_SUPERADMIN".equalsIgnoreCase(a) || "SUPERADMIN".equalsIgnoreCase(a));
+        }
+
+        UUID effectiveOrgId = orgId;
+        if (effectiveOrgId == null && orgIdHeader != null && !orgIdHeader.trim().isEmpty() && !"all".equalsIgnoreCase(orgIdHeader.trim())) {
+            try {
+                effectiveOrgId = UUID.fromString(orgIdHeader.trim());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+
+        if (isSuperAdmin && (orgId == null || "all".equalsIgnoreCase(orgIdHeader))) {
+            if ("all".equalsIgnoreCase(orgIdHeader) || orgId == null && (orgIdHeader == null || orgIdHeader.trim().isEmpty())) {
+                effectiveOrgId = null;
+            }
+        }
+
         List<Operation> operations = operationService.searchOperations(
-                operationId, name, startDate, endDate, locationName,
+                operationId, effectiveOrgId, name, startDate, endDate, locationName,
                 isActive, ticketPrice, ccFee, ccFeeType, createdBy, createdAt, updatedBy, updatedAt);
 
         if (operations.isEmpty()) {
