@@ -3,6 +3,7 @@ package com.kahua.assets.controller;
 import com.kahua.assets.dto.OperationDto;
 import com.kahua.assets.dto.OperationPatchDto;
 import com.kahua.assets.entity.Operation;
+import com.kahua.assets.repository.OperationRepository;
 import com.kahua.assets.service.OperationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -26,23 +28,59 @@ import java.util.UUID;
 public class OperationController {
 
     private final OperationService operationService;
+    private final OperationRepository operationRepository;
 
     @PostMapping
     public ResponseEntity<Operation> createOperation(
             @Valid @RequestBody OperationDto operationDto,
             @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader) {
-        if (operationDto.getOrgId() == null && orgIdHeader != null && !orgIdHeader.trim().isEmpty()) {
+        UUID headerOrgId = null;
+        if (orgIdHeader != null && !orgIdHeader.trim().isEmpty() && !"all".equalsIgnoreCase(orgIdHeader.trim())) {
             try {
-                operationDto.setOrgId(UUID.fromString(orgIdHeader.trim()));
+                headerOrgId = UUID.fromString(orgIdHeader.trim());
             } catch (IllegalArgumentException ignored) {
             }
         }
+
+        if (headerOrgId != null) {
+            if (operationDto.getOrgId() != null && !operationDto.getOrgId().equals(headerOrgId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Users can only manage items for their single selected organization");
+            }
+            operationDto.setOrgId(headerOrgId);
+        } else if (operationDto.getOrgId() == null) {
+            operationDto.setOrgId(UUID.fromString("a0000000-0000-0000-0000-000000000001"));
+        }
+
         Operation createdOperation = operationService.createOperation(operationDto);
         return ResponseEntity.created(URI.create("/api/operations/" + createdOperation.getOperationId())).body(createdOperation);
     }
 
     @PatchMapping("/{operationId}")
-    public ResponseEntity<Operation> updateOperation(@PathVariable UUID operationId, @RequestBody OperationPatchDto operationPatchDto) {
+    public ResponseEntity<Operation> updateOperation(
+            @PathVariable UUID operationId,
+            @RequestBody OperationPatchDto operationPatchDto,
+            @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader) {
+
+        UUID headerOrgId = null;
+        if (orgIdHeader != null && !orgIdHeader.trim().isEmpty() && !"all".equalsIgnoreCase(orgIdHeader.trim())) {
+            try {
+                headerOrgId = UUID.fromString(orgIdHeader.trim());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+
+        if (headerOrgId != null) {
+            Operation existing = operationRepository.findById(operationId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Operation not found"));
+            if (existing.getOrgId() != null && !existing.getOrgId().equals(headerOrgId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Users can only manage items for their single selected organization");
+            }
+            if (operationPatchDto.getOrgId() != null && !operationPatchDto.getOrgId().equals(headerOrgId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot reassign operation outside the single selected organization");
+            }
+            operationPatchDto.setOrgId(headerOrgId);
+        }
+
         Operation updatedOperation = operationService.updateOperation(operationId, operationPatchDto);
         return ResponseEntity.ok(updatedOperation);
     }
@@ -81,10 +119,11 @@ public class OperationController {
             }
         }
 
-        if (isSuperAdmin && (orgId == null || "all".equalsIgnoreCase(orgIdHeader))) {
-            if ("all".equalsIgnoreCase(orgIdHeader) || orgId == null && (orgIdHeader == null || orgIdHeader.trim().isEmpty())) {
-                effectiveOrgId = null;
-            }
+        // Only allow unscoped global view if explicitly 'all' header AND superadmin
+        if ("all".equalsIgnoreCase(orgIdHeader) && isSuperAdmin) {
+            effectiveOrgId = null;
+        } else if (effectiveOrgId == null && !isSuperAdmin) {
+            effectiveOrgId = UUID.fromString("a0000000-0000-0000-0000-000000000001");
         }
 
         List<Operation> operations = operationService.searchOperations(
