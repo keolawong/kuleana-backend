@@ -128,10 +128,13 @@ public class AuthController {
             authService.handleSuccessfulLogin(loginRequest.getUsername());
         }
 
+        boolean isSuper = adminScopeService != null && adminScopeService.isSuperAdmin(authentication);
+        List<String> adminScopes = adminScopeService != null ? adminScopeService.getAdminScopes(authentication) : List.of();
+
         List<Map<String, Object>> orgs = Collections.emptyList();
         UUID activeOrgId = null;
         if (user != null) {
-            orgs = getUserOrganizations(user.getId());
+            orgs = getUserOrganizations(user.getId(), isSuper);
             if (!orgs.isEmpty()) {
                 activeOrgId = (UUID) orgs.get(0).get("id");
             }
@@ -184,8 +187,6 @@ public class AuthController {
                 apps = new ArrayList<>(inferred);
             }
             body.put("apps", apps);
-            boolean isSuper = adminScopeService != null && adminScopeService.isSuperAdmin(authentication);
-            List<String> adminScopes = adminScopeService != null ? adminScopeService.getAdminScopes(authentication) : List.of();
             body.put("isSuperAdmin", isSuper);
             body.put("adminScopes", adminScopes);
             if (userApplicationRepository != null) {
@@ -575,7 +576,7 @@ public class AuthController {
             body.put("applicationDetails", appDetails);
         }
 
-        List<Map<String, Object>> orgs = getUserOrganizations(user.getId());
+        List<Map<String, Object>> orgs = getUserOrganizations(user.getId(), isSuperMe);
         UUID activeOrgId = !orgs.isEmpty() ? (UUID) orgs.get(0).get("id") : null;
         body.put("organizations", orgs);
         body.put("activeOrgId", activeOrgId != null ? activeOrgId.toString() : null);
@@ -583,8 +584,31 @@ public class AuthController {
         return ResponseEntity.ok(body);
     }
 
-    private List<Map<String, Object>> getUserOrganizations(UUID userId) {
-        if (userOrganizationRepository == null || organizationRepository == null || userId == null) {
+    private List<Map<String, Object>> getUserOrganizations(UUID userId, boolean isSuperAdmin) {
+        if (organizationRepository == null || userId == null) {
+            return Collections.emptyList();
+        }
+        if (isSuperAdmin) {
+            List<Organization> allOrgs = organizationRepository.findAll();
+            Map<UUID, String> roleByOrgId = userOrganizationRepository != null
+                    ? userOrganizationRepository.findByUserId(userId).stream()
+                            .collect(Collectors.toMap(UserOrganization::getOrgId, UserOrganization::getRole, (a, b) -> a))
+                    : Collections.emptyMap();
+
+            return allOrgs.stream()
+                    .map(org -> {
+                        Map<String, Object> map = new LinkedHashMap<>();
+                        map.put("id", org.getId());
+                        map.put("slug", org.getSlug());
+                        map.put("name", org.getName());
+                        map.put("role", roleByOrgId.getOrDefault(org.getId(), "ORG_ADMIN"));
+                        map.put("status", org.getStatus());
+                        return map;
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        if (userOrganizationRepository == null) {
             return Collections.emptyList();
         }
         List<UserOrganization> userOrgs = userOrganizationRepository.findByUserId(userId);
@@ -604,6 +628,7 @@ public class AuthController {
                     map.put("slug", org.getSlug());
                     map.put("name", org.getName());
                     map.put("role", uo.getRole());
+                    map.put("status", org.getStatus());
                     return map;
                 })
                 .filter(Objects::nonNull)
