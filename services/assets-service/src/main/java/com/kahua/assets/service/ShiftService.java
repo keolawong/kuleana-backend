@@ -26,10 +26,10 @@ public class ShiftService {
 
     @Transactional
     public Shift createShift(ShiftDto dto) {
+        Shift shift = new Shift();
         Operation operation = operationRepository.findById(dto.getOperationId())
                 .orElseThrow(() -> new EntityNotFoundException("Operation not found with id: " + dto.getOperationId()));
 
-        Shift shift = new Shift();
         shift.setOperation(operation);
         shift.setName(dto.getName());
         shift.setStartTime(dto.getStartTime());
@@ -48,14 +48,10 @@ public class ShiftService {
         Shift shift = shiftRepository.findById(shiftId)
                 .orElseThrow(() -> new EntityNotFoundException("Shift not found with id: " + shiftId));
 
-        if (dto.isDirty("operationId")) {
-            if (dto.getOperationId() == null) {
-                shift.setOperation(null);
-            } else {
-                Operation operation = operationRepository.findById(dto.getOperationId())
-                        .orElseThrow(() -> new EntityNotFoundException("Operation not found with id: " + dto.getOperationId()));
-                shift.setOperation(operation);
-            }
+        if (dto.isDirty("operationId") && dto.getOperationId() != null) {
+            Operation operation = operationRepository.findById(dto.getOperationId())
+                    .orElseThrow(() -> new EntityNotFoundException("Operation not found with id: " + dto.getOperationId()));
+            shift.setOperation(operation);
         }
         if (dto.isDirty("name")) {
             shift.setName(dto.getName());
@@ -81,11 +77,11 @@ public class ShiftService {
 
     @Transactional(readOnly = true)
     public List<Shift> searchShifts(
-            UUID shiftId, UUID operationId, String name, Instant startTime, Instant endTime,
+            UUID shiftId, UUID operationId, UUID orgId, String name, Instant startTime, Instant endTime,
             String traffic, String status, String createdBy, Instant createdAt,
             String updatedBy, Instant updatedAt, Boolean activeOperation) {
         Specification<Shift> spec = ShiftSpecification.search(
-                shiftId, operationId, name, startTime, endTime, traffic,
+                shiftId, operationId, orgId, name, startTime, endTime, traffic,
                 status, createdBy, createdAt, updatedBy, updatedAt, activeOperation);
         return shiftRepository.findAll(spec);
     }

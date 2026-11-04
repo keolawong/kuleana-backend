@@ -13,13 +13,17 @@ import java.util.UUID;
 @Setter
 @Entity
 @Table(name = "gate", schema = "asset", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_gate_name", columnNames = {"name"})
+        @UniqueConstraint(name = "uq_gate_operation_name", columnNames = {"operation_id", "name"})
 })
 public class Gate {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "gate_id", nullable = false)
     private UUID gateId;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "operation_id", nullable = false)
+    private Operation operation;
 
     @Column(name = "name", nullable = false)
     private String name;

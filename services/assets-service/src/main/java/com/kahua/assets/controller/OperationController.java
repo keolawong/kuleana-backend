@@ -42,13 +42,12 @@ public class OperationController {
             }
         }
 
-        if (headerOrgId != null) {
-            if (operationDto.getOrgId() != null && !operationDto.getOrgId().equals(headerOrgId)) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Users can only manage items for their single selected organization");
+        if (operationDto.getOrgId() == null) {
+            if (headerOrgId != null) {
+                operationDto.setOrgId(headerOrgId);
+            } else {
+                operationDto.setOrgId(UUID.fromString("a0000000-0000-0000-0000-000000000001"));
             }
-            operationDto.setOrgId(headerOrgId);
-        } else if (operationDto.getOrgId() == null) {
-            operationDto.setOrgId(UUID.fromString("a0000000-0000-0000-0000-000000000001"));
         }
 
         Operation createdOperation = operationService.createOperation(operationDto);
@@ -61,24 +60,11 @@ public class OperationController {
             @RequestBody OperationPatchDto operationPatchDto,
             @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader) {
 
-        UUID headerOrgId = null;
-        if (orgIdHeader != null && !orgIdHeader.trim().isEmpty() && !"all".equalsIgnoreCase(orgIdHeader.trim())) {
-            try {
-                headerOrgId = UUID.fromString(orgIdHeader.trim());
-            } catch (IllegalArgumentException ignored) {
-            }
-        }
+        Operation existing = operationRepository.findById(operationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Operation not found"));
 
-        if (headerOrgId != null) {
-            Operation existing = operationRepository.findById(operationId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Operation not found"));
-            if (existing.getOrgId() != null && !existing.getOrgId().equals(headerOrgId)) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Users can only manage items for their single selected organization");
-            }
-            if (operationPatchDto.getOrgId() != null && !operationPatchDto.getOrgId().equals(headerOrgId)) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot reassign operation outside the single selected organization");
-            }
-            operationPatchDto.setOrgId(headerOrgId);
+        if (operationPatchDto.getOrgId() != null) {
+            existing.setOrgId(operationPatchDto.getOrgId());
         }
 
         Operation updatedOperation = operationService.updateOperation(operationId, operationPatchDto);
@@ -103,14 +89,6 @@ public class OperationController {
             @RequestParam(required = false) String updatedBy,
             @RequestParam(required = false) Instant updatedAt) {
 
-        boolean isSuperAdmin = false;
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getAuthorities() != null) {
-            isSuperAdmin = authentication.getAuthorities().stream()
-                    .map(GrantedAuthority::getAuthority)
-                    .anyMatch(a -> "ROLE_SUPERADMIN".equalsIgnoreCase(a) || "SUPERADMIN".equalsIgnoreCase(a));
-        }
-
         UUID effectiveOrgId = orgId;
         if (effectiveOrgId == null && orgIdHeader != null && !orgIdHeader.trim().isEmpty() && !"all".equalsIgnoreCase(orgIdHeader.trim())) {
             try {
@@ -118,6 +96,11 @@ public class OperationController {
             } catch (IllegalArgumentException ignored) {
             }
         }
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isSuperAdmin = auth != null && auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(a -> a.equals("ROLE_SUPERADMIN") || a.equals("SUPERADMIN"));
 
         // Only allow unscoped global view if explicitly 'all' header AND superadmin
         if ("all".equalsIgnoreCase(orgIdHeader) && isSuperAdmin) {

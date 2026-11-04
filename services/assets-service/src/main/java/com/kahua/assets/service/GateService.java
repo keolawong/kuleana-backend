@@ -3,8 +3,10 @@ package com.kahua.assets.service;
 import com.kahua.assets.dto.GateDto;
 import com.kahua.assets.dto.GatePatchDto;
 import com.kahua.assets.entity.Gate;
+import com.kahua.assets.entity.Operation;
 import com.kahua.assets.repository.GateRepository;
 import com.kahua.assets.repository.GateSpecification;
+import com.kahua.assets.repository.OperationRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
@@ -20,11 +22,30 @@ import java.util.UUID;
 public class GateService {
 
     private final GateRepository gateRepository;
+    private final OperationRepository operationRepository;
 
     @Transactional
     public Gate createGate(GateDto dto) {
         Gate gate = new Gate();
         gate.setName(dto.getName());
+
+        UUID opId = dto.getOperationId();
+        Operation operation = null;
+        if (opId != null) {
+            operation = operationRepository.findById(opId)
+                    .orElseThrow(() -> new EntityNotFoundException("Operation not found with id: " + opId));
+        } else {
+            // Default to first active operation
+            List<Operation> ops = operationRepository.findAll();
+            operation = ops.stream()
+                    .filter(o -> Boolean.TRUE.equals(o.getIsActive()))
+                    .findFirst()
+                    .orElse(!ops.isEmpty() ? ops.get(0) : null);
+            if (operation == null) {
+                throw new IllegalStateException("No operation exists to associate with gate");
+            }
+        }
+        gate.setOperation(operation);
         
         if (dto.getIsActive() != null) {
             gate.setIsActive(dto.getIsActive());
@@ -45,6 +66,11 @@ public class GateService {
         Gate gate = gateRepository.findById(gateId)
                 .orElseThrow(() -> new EntityNotFoundException("Gate not found with id: " + gateId));
 
+        if (dto.isDirty("operationId") && dto.getOperationId() != null) {
+            Operation op = operationRepository.findById(dto.getOperationId())
+                    .orElseThrow(() -> new EntityNotFoundException("Operation not found with id: " + dto.getOperationId()));
+            gate.setOperation(op);
+        }
         if (dto.isDirty("name")) {
             gate.setName(dto.getName());
         }
@@ -72,12 +98,12 @@ public class GateService {
 
     @Transactional(readOnly = true)
     public List<Gate> searchGates(
-            UUID gateId, String name, Boolean isActive, Integer cashBanksRequiredForBusy,
+            UUID gateId, UUID operationId, UUID orgId, String name, Boolean isActive, Integer cashBanksRequiredForBusy,
             Integer cashBanksRequiredForModerate, Integer cashBanksRequiredForLite,
             Integer displayOrder, String createdBy, Instant createdAt,
             String updatedBy, Instant updatedAt) {
         Specification<Gate> spec = GateSpecification.search(
-                gateId, name, isActive, cashBanksRequiredForBusy, cashBanksRequiredForModerate,
+                gateId, operationId, orgId, name, isActive, cashBanksRequiredForBusy, cashBanksRequiredForModerate,
                 cashBanksRequiredForLite, displayOrder, createdBy, createdAt, updatedBy, updatedAt);
         return gateRepository.findAll(spec);
     }

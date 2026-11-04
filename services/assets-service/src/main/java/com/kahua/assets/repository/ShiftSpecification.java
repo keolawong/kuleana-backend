@@ -14,7 +14,7 @@ import java.util.UUID;
 public class ShiftSpecification {
 
     public static Specification<Shift> search(
-            UUID shiftId, UUID operationId, String name, Instant startTime, Instant endTime,
+            UUID shiftId, UUID operationId, UUID orgId, String name, Instant startTime, Instant endTime,
             String traffic, String status, String createdBy, Instant createdAt,
             String updatedBy, Instant updatedAt, Boolean activeOperation) {
 
@@ -26,12 +26,18 @@ public class ShiftSpecification {
             }
 
             Join<Shift, Operation> operationJoin = null;
-            if (operationId != null || activeOperation != null) {
+            if (operationId != null || activeOperation != null || orgId != null) {
                 operationJoin = root.join("operation");
             }
 
             if (operationId != null) {
                 predicates.add(cb.equal(operationJoin.get("operationId"), operationId));
+            }
+            if (orgId != null) {
+                predicates.add(cb.equal(operationJoin.get("orgId"), orgId));
+            }
+            if (activeOperation != null) {
+                predicates.add(cb.equal(operationJoin.get("isActive"), activeOperation));
             }
             if (name != null && !name.trim().isEmpty()) {
                 predicates.add(cb.like(cb.lower(root.get("name")), "%" + name.toLowerCase() + "%"));
@@ -59,9 +65,6 @@ public class ShiftSpecification {
             }
             if (updatedAt != null) {
                 predicates.add(cb.equal(root.get("updatedAt"), updatedAt));
-            }
-            if (activeOperation != null) {
-                predicates.add(cb.equal(operationJoin.get("isActive"), activeOperation));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

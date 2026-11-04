@@ -12,7 +12,7 @@ import java.util.UUID;
 public class GateCaptainSpecification {
 
     public static Specification<GateCaptain> search(
-            UUID gateCaptainId, String captainName, UUID gateId, UUID operationId, UUID shiftId,
+            UUID gateCaptainId, String captainName, UUID gateId, UUID operationId, UUID shiftId, UUID orgId,
             String createdBy, Instant createdAt, String updatedBy, Instant updatedAt) {
 
         return (root, query, cb) -> {
@@ -32,6 +32,9 @@ public class GateCaptainSpecification {
             }
             if (shiftId != null) {
                 predicates.add(cb.equal(root.join("shift").get("shiftId"), shiftId));
+            }
+            if (orgId != null) {
+                predicates.add(cb.equal(root.join("operation").get("orgId"), orgId));
             }
             if (createdBy != null && !createdBy.trim().isEmpty()) {
                 predicates.add(cb.equal(root.get("createdBy"), createdBy));

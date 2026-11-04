@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 @Data
 @NoArgsConstructor
@@ -14,6 +15,7 @@ import java.util.Set;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class GatePatchDto {
     private String name;
+    private UUID operationId;
     private Boolean isActive;
     private Integer cashBanksRequiredForBusy;
     private Integer cashBanksRequiredForModerate;
@@ -26,6 +28,11 @@ public class GatePatchDto {
     public void setName(String name) {
         this.name = name;
         this.dirtyFields.add("name");
+    }
+
+    public void setOperationId(UUID operationId) {
+        this.operationId = operationId;
+        this.dirtyFields.add("operationId");
     }
 
     public void setIsActive(Boolean isActive) {

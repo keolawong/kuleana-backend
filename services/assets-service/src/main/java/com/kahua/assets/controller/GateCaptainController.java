@@ -7,6 +7,9 @@ import com.kahua.assets.service.GateCaptainService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -43,10 +46,28 @@ public class GateCaptainController {
             @RequestParam(required = false) String createdBy,
             @RequestParam(required = false) Instant createdAt,
             @RequestParam(required = false) String updatedBy,
-            @RequestParam(required = false) Instant updatedAt) {
+            @RequestParam(required = false) Instant updatedAt,
+            @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader) {
+
+        UUID effectiveOrgId = null;
+        if (orgIdHeader != null && !orgIdHeader.trim().isEmpty() && !"all".equalsIgnoreCase(orgIdHeader.trim())) {
+            try {
+                effectiveOrgId = UUID.fromString(orgIdHeader.trim());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isSuperAdmin = auth != null && auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(a -> a.equals("ROLE_SUPERADMIN") || a.equals("SUPERADMIN"));
+
+        if ("all".equalsIgnoreCase(orgIdHeader) && isSuperAdmin) {
+            effectiveOrgId = null;
+        }
 
         List<GateCaptain> gateCaptains = gateCaptainService.searchGateCaptains(
-                gateCaptainId, captainName, gateId, operationId, shiftId,
+                gateCaptainId, captainName, gateId, operationId, shiftId, effectiveOrgId,
                 createdBy, createdAt, updatedBy, updatedAt);
 
         if (gateCaptains.isEmpty()) {

@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Data
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -13,6 +15,8 @@ import lombok.NoArgsConstructor;
 public class GateDto {
     @NotBlank(message = "Name is required")
     private String name;
+
+    private UUID operationId;
 
     private Boolean isActive;
 

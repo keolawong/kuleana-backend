@@ -32,17 +32,19 @@ public class GateCaptainService {
 
     @Transactional
     public GateCaptain createGateCaptain(GateCaptainDto dto) {
-        Gate gate = gateRepository.findById(dto.getGateId())
-                .orElseThrow(() -> new EntityNotFoundException("Gate not found with id: " + dto.getGateId()));
-        Operation operation = operationRepository.findById(dto.getOperationId())
-                .orElseThrow(() -> new EntityNotFoundException("Operation not found with id: " + dto.getOperationId()));
-        Shift shift = shiftRepository.findById(dto.getShiftId())
-                .orElseThrow(() -> new EntityNotFoundException("Shift not found with id: " + dto.getShiftId()));
-
         GateCaptain gateCaptain = new GateCaptain();
         gateCaptain.setCaptainName(dto.getCaptainName());
+
+        Gate gate = gateRepository.findById(dto.getGateId())
+                .orElseThrow(() -> new EntityNotFoundException("Gate not found with id: " + dto.getGateId()));
         gateCaptain.setGate(gate);
+
+        Operation operation = operationRepository.findById(dto.getOperationId())
+                .orElseThrow(() -> new EntityNotFoundException("Operation not found with id: " + dto.getOperationId()));
         gateCaptain.setOperation(operation);
+
+        Shift shift = shiftRepository.findById(dto.getShiftId())
+                .orElseThrow(() -> new EntityNotFoundException("Shift not found with id: " + dto.getShiftId()));
         gateCaptain.setShift(shift);
 
         String currentUser = "System";
@@ -95,10 +97,10 @@ public class GateCaptainService {
 
     @Transactional(readOnly = true)
     public List<GateCaptain> searchGateCaptains(
-            UUID gateCaptainId, String captainName, UUID gateId, UUID operationId, UUID shiftId,
+            UUID gateCaptainId, String captainName, UUID gateId, UUID operationId, UUID shiftId, UUID orgId,
             String createdBy, Instant createdAt, String updatedBy, Instant updatedAt) {
         Specification<GateCaptain> spec = GateCaptainSpecification.search(
-                gateCaptainId, captainName, gateId, operationId, shiftId,
+                gateCaptainId, captainName, gateId, operationId, shiftId, orgId,
                 createdBy, createdAt, updatedBy, updatedAt);
         return gateCaptainRepository.findAll(spec);
     }
