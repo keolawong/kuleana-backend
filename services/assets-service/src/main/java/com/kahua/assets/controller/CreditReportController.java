@@ -36,6 +36,8 @@ public class CreditReportController {
 
     @GetMapping
     public ResponseEntity<List<CreditReport>> getCreditReports(
+            @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader,
+            @RequestParam(required = false) UUID orgId,
             @RequestParam(required = false) UUID creditReportId,
             @RequestParam(required = false) BigDecimal totalAmount,
             @RequestParam(required = false) UUID operationId,
@@ -49,8 +51,12 @@ public class CreditReportController {
             @RequestParam(required = false) String updatedBy,
             @RequestParam(required = false) Instant updatedAt) {
 
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String targetOrgStr = (orgId != null) ? orgId.toString() : orgIdHeader;
+        UUID effectiveOrgId = com.kuleanasystems.security.TenantSecurityUtil.resolveEffectiveOrgId(targetOrgStr, auth);
+
         List<CreditReport> creditReports = creditReportService.searchCreditReports(
-                creditReportId, totalAmount, operationId, shiftId, gateId,
+                creditReportId, totalAmount, operationId, effectiveOrgId, shiftId, gateId,
                 deviceId, processId, personStickerId, createdBy, createdAt, updatedBy, updatedAt);
 
         if (creditReports.isEmpty()) {

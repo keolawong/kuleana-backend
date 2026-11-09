@@ -15,7 +15,7 @@ public class CashBankSpecification {
     public static Specification<CashBank> search(
             UUID cashBankId, String bankName, BigDecimal startingAmount, BigDecimal officialCount,
             Integer count100s, Integer count50s, Integer count20s, Integer count10s,
-            Integer count5s, Integer count1s, Integer count1cs, String status, UUID operationId,
+            Integer count5s, Integer count1s, Integer count1cs, String status, UUID operationId, UUID orgId,
             UUID shiftId, UUID gateId, String deviceId, UUID parentCashBankId,
             UUID processId, UUID personStickerId, String createdBy, Instant createdAt, String updatedBy, Instant updatedAt) {
 
@@ -58,8 +58,14 @@ public class CashBankSpecification {
             if (status != null && !status.trim().isEmpty()) {
                 predicates.add(cb.equal(root.get("status"), status));
             }
-            if (operationId != null) {
-                predicates.add(cb.equal(root.join("operation").get("operationId"), operationId));
+            if (operationId != null || orgId != null) {
+                var opJoin = root.join("operation");
+                if (operationId != null) {
+                    predicates.add(cb.equal(opJoin.get("operationId"), operationId));
+                }
+                if (orgId != null) {
+                    predicates.add(cb.equal(opJoin.get("orgId"), orgId));
+                }
             }
             if (shiftId != null) {
                 predicates.add(cb.equal(root.join("shift").get("shiftId"), shiftId));

@@ -5,6 +5,7 @@ import com.kahua.assets.dto.OperationPatchDto;
 import com.kahua.assets.entity.Operation;
 import com.kahua.assets.repository.OperationRepository;
 import com.kahua.assets.service.OperationService;
+import com.kuleanasystems.security.TenantSecurityUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -34,22 +35,15 @@ public class OperationController {
     public ResponseEntity<Operation> createOperation(
             @Valid @RequestBody OperationDto operationDto,
             @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader) {
-        UUID headerOrgId = null;
-        if (orgIdHeader != null && !orgIdHeader.trim().isEmpty() && !"all".equalsIgnoreCase(orgIdHeader.trim())) {
-            try {
-                headerOrgId = UUID.fromString(orgIdHeader.trim());
-            } catch (IllegalArgumentException ignored) {
-            }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String targetOrgStr = operationDto.getOrgId() != null ? operationDto.getOrgId().toString() : orgIdHeader;
+        UUID effectiveOrgId = TenantSecurityUtil.resolveEffectiveOrgId(targetOrgStr, auth);
+
+        if (effectiveOrgId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Organization ID is required to create an operation");
         }
 
-        if (operationDto.getOrgId() == null) {
-            if (headerOrgId != null) {
-                operationDto.setOrgId(headerOrgId);
-            } else {
-                operationDto.setOrgId(UUID.fromString("a0000000-0000-0000-0000-000000000001"));
-            }
-        }
-
+        operationDto.setOrgId(effectiveOrgId);
         Operation createdOperation = operationService.createOperation(operationDto);
         return ResponseEntity.created(URI.create("/api/operations/" + createdOperation.getOperationId())).body(createdOperation);
     }
@@ -63,8 +57,13 @@ public class OperationController {
         Operation existing = operationRepository.findById(operationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Operation not found"));
 
-        if (operationPatchDto.getOrgId() != null) {
-            existing.setOrgId(operationPatchDto.getOrgId());
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (existing.getOrgId() != null && !TenantSecurityUtil.isMemberOf(auth, existing.getOrgId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to operation's organization");
+        }
+
+        if (operationPatchDto.getOrgId() != null && !TenantSecurityUtil.isMemberOf(auth, operationPatchDto.getOrgId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to target organization");
         }
 
         Operation updatedOperation = operationService.updateOperation(operationId, operationPatchDto);
@@ -89,25 +88,9 @@ public class OperationController {
             @RequestParam(required = false) String updatedBy,
             @RequestParam(required = false) Instant updatedAt) {
 
-        UUID effectiveOrgId = orgId;
-        if (effectiveOrgId == null && orgIdHeader != null && !orgIdHeader.trim().isEmpty() && !"all".equalsIgnoreCase(orgIdHeader.trim())) {
-            try {
-                effectiveOrgId = UUID.fromString(orgIdHeader.trim());
-            } catch (IllegalArgumentException ignored) {
-            }
-        }
-
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean isSuperAdmin = auth != null && auth.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(a -> a.equals("ROLE_SUPERADMIN") || a.equals("SUPERADMIN"));
-
-        // Only allow unscoped global view if explicitly 'all' header AND superadmin
-        if ("all".equalsIgnoreCase(orgIdHeader) && isSuperAdmin) {
-            effectiveOrgId = null;
-        } else if (effectiveOrgId == null && !isSuperAdmin) {
-            effectiveOrgId = UUID.fromString("a0000000-0000-0000-0000-000000000001");
-        }
+        String targetOrgStr = (orgId != null) ? orgId.toString() : orgIdHeader;
+        UUID effectiveOrgId = TenantSecurityUtil.resolveEffectiveOrgId(targetOrgStr, auth);
 
         List<Operation> operations = operationService.searchOperations(
                 operationId, effectiveOrgId, name, startDate, endDate, locationName,

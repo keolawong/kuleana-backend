@@ -13,7 +13,7 @@ public class TicketBookSpecification {
 
     public static Specification<TicketBook> search(
             UUID ticketBookId, String scanCode, Integer startNum, Integer endNum,
-            Integer nextTicket, Boolean isReusable, String status, UUID operationId,
+            Integer nextTicket, Boolean isReusable, String status, UUID operationId, UUID orgId,
             UUID shiftId, UUID gateId, String deviceId, UUID parentTicketBookId,
             UUID processId, UUID personStickerId, String createdBy, Instant createdAt, String updatedBy, Instant updatedAt) {
 
@@ -41,8 +41,14 @@ public class TicketBookSpecification {
             if (status != null && !status.trim().isEmpty()) {
                 predicates.add(cb.equal(root.get("status"), status));
             }
-            if (operationId != null) {
-                predicates.add(cb.equal(root.join("operation").get("operationId"), operationId));
+            if (operationId != null || orgId != null) {
+                var opJoin = root.join("operation");
+                if (operationId != null) {
+                    predicates.add(cb.equal(opJoin.get("operationId"), operationId));
+                }
+                if (orgId != null) {
+                    predicates.add(cb.equal(opJoin.get("orgId"), orgId));
+                }
             }
             if (shiftId != null) {
                 predicates.add(cb.equal(root.join("shift").get("shiftId"), shiftId));

@@ -52,6 +52,8 @@ public class TicketBookController {
 
     @GetMapping
     public ResponseEntity<List<TicketBook>> getTicketBooks(
+            @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader,
+            @RequestParam(required = false) UUID orgId,
             @RequestParam(required = false) UUID ticketBookId,
             @RequestParam(required = false) String scanCode,
             @RequestParam(required = false) Integer startNum,
@@ -71,9 +73,13 @@ public class TicketBookController {
             @RequestParam(required = false) String updatedBy,
             @RequestParam(required = false) Instant updatedAt) {
 
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String targetOrgStr = (orgId != null) ? orgId.toString() : orgIdHeader;
+        UUID effectiveOrgId = com.kuleanasystems.security.TenantSecurityUtil.resolveEffectiveOrgId(targetOrgStr, auth);
+
         List<TicketBook> ticketBooks = ticketBookService.searchTicketBooks(
                 ticketBookId, scanCode, startNum, endNum, nextTicket, isReusable, status,
-                operationId, shiftId, gateId, deviceId, parentTicketBookId, processId, personStickerId,
+                operationId, effectiveOrgId, shiftId, gateId, deviceId, parentTicketBookId, processId, personStickerId,
                 createdBy, createdAt, updatedBy, updatedAt);
 
         if (shiftId != null) {

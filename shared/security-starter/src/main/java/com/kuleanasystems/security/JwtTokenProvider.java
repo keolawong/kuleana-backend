@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.security.Key;
 import java.util.Date;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
@@ -46,6 +47,10 @@ public class JwtTokenProvider {
     }
 
     public String generateToken(String username, String roles, String activeOrgId) {
+        return generateToken(username, roles, activeOrgId, (String) null);
+    }
+
+    public String generateToken(String username, String roles, String activeOrgId, String orgIds) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
@@ -60,7 +65,23 @@ public class JwtTokenProvider {
             builder.claim("orgId", activeOrgId.trim());
         }
 
+        if (orgIds != null && !orgIds.trim().isEmpty()) {
+            builder.claim("orgIds", orgIds.trim());
+        }
+
         return builder.signWith(key, SignatureAlgorithm.HS256).compact();
+    }
+
+    public List<String> getOrgIdsFromJwtToken(String token) {
+        Claims claims = getClaimsFromJwtToken(token);
+        String orgIds = claims.get("orgIds", String.class);
+        if (orgIds != null && !orgIds.trim().isEmpty()) {
+            return java.util.Arrays.stream(orgIds.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toList());
+        }
+        return java.util.Collections.emptyList();
     }
 
     public String getUsernameFromJwtToken(String token) {

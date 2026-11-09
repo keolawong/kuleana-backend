@@ -141,7 +141,12 @@ public class AuthController {
         }
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = tokenProvider.generateToken(authentication, activeOrgId != null ? activeOrgId.toString() : null);
+        String roles = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.joining(","));
+
+        String orgIdsClaim = orgs.stream().map(o -> String.valueOf(o.get("id"))).collect(Collectors.joining(","));
+        String jwt = tokenProvider.generateToken(authentication.getName(), roles, activeOrgId != null ? activeOrgId.toString() : null, orgIdsClaim);
 
         ResponseCookie cookie = ResponseCookie.from("jwt", jwt)
                 .httpOnly(true)
@@ -150,10 +155,6 @@ public class AuthController {
                 .maxAge(24 * 60 * 60)
                 .sameSite("None")
                 .build();
-
-        String roles = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.joining(","));
 
         Map<String, Object> body = new HashMap<>();
         body.put("username", authentication.getName());
@@ -275,6 +276,49 @@ public class AuthController {
             }
             if (!rolesList.isEmpty()) {
                 userRoleRepository.saveAll(rolesList);
+            }
+        }
+
+        // Organization assignment / creation
+        if (userOrganizationRepository != null && organizationRepository != null) {
+            String orgName = request.getOrganizationName() != null ? request.getOrganizationName().trim() : "";
+            String orgSlug = request.getOrganizationSlug() != null ? request.getOrganizationSlug().trim().toLowerCase() : "";
+
+            if (!orgName.isEmpty() || !orgSlug.isEmpty()) {
+                if (orgSlug.isEmpty()) {
+                    orgSlug = orgName.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
+                }
+                Optional<Organization> existingOrg = organizationRepository.findBySlug(orgSlug);
+                Organization targetOrg;
+                String userOrgRole;
+
+                if (existingOrg.isPresent()) {
+                    targetOrg = existingOrg.get();
+                    userOrgRole = "MEMBER";
+                } else {
+                    targetOrg = organizationRepository.save(Organization.builder()
+                            .slug(orgSlug)
+                            .name(!orgName.isEmpty() ? orgName : orgSlug)
+                            .status("active")
+                            .build());
+                    userOrgRole = "ORG_ADMIN";
+                }
+
+                userOrganizationRepository.save(UserOrganization.builder()
+                        .userId(user.getId())
+                        .orgId(targetOrg.getId())
+                        .role(userOrgRole)
+                        .build());
+            } else {
+                // Link to default organization so user is never orphaned
+                UUID defaultOrgId = UUID.fromString("a0000000-0000-0000-0000-000000000001");
+                organizationRepository.findById(defaultOrgId).ifPresent(defaultOrg -> {
+                    userOrganizationRepository.save(UserOrganization.builder()
+                            .userId(user.getId())
+                            .orgId(defaultOrg.getId())
+                            .role("MEMBER")
+                            .build());
+                });
             }
         }
 

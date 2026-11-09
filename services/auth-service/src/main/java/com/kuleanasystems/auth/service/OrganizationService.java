@@ -105,16 +105,15 @@ public class OrganizationService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated");
         }
 
-        boolean isSuper = adminScopeService != null && adminScopeService.isSuperAdmin(authentication);
-        if (!isSuper) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only superadmin can create organizations");
+        String rawSlug = request.getSlug() != null && !request.getSlug().trim().isEmpty()
+                ? request.getSlug().trim().toLowerCase()
+                : (request.getName() != null ? request.getName().trim().toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "") : "");
+
+        if (rawSlug.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Organization name or slug is required");
         }
 
-        if (request.getSlug() == null || request.getSlug().trim().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Slug is required");
-        }
-
-        String normalizedSlug = request.getSlug().trim().toLowerCase();
+        String normalizedSlug = rawSlug;
         if (organizationRepository.existsBySlug(normalizedSlug)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Organization with slug '" + normalizedSlug + "' already exists");
         }

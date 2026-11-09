@@ -12,6 +12,10 @@ public class RegistrationRequest {
     private String firstName;
     private String lastName;
 
+    private String organizationName;
+    private String organizationSlug;
+    private String inviteCode;
+
     @JsonAlias({"questions"})
     private List<SecurityQuestionDto> securityQuestions;
 

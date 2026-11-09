@@ -93,20 +93,7 @@ public class ShiftController {
     }
 
     private UUID resolveOrgId(String orgIdHeader) {
-        if (orgIdHeader == null || orgIdHeader.trim().isEmpty() || "all".equalsIgnoreCase(orgIdHeader.trim())) {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            boolean isSuperAdmin = auth != null && auth.getAuthorities().stream()
-                    .map(GrantedAuthority::getAuthority)
-                    .anyMatch(a -> a.equals("ROLE_SUPERADMIN") || a.equals("SUPERADMIN"));
-            if ("all".equalsIgnoreCase(orgIdHeader) && isSuperAdmin) {
-                return null;
-            }
-            return null;
-        }
-        try {
-            return UUID.fromString(orgIdHeader.trim());
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return com.kuleanasystems.security.TenantSecurityUtil.resolveEffectiveOrgId(orgIdHeader, auth);
     }
 }

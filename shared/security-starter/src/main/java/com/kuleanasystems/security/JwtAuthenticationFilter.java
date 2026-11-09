@@ -52,10 +52,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 if (!isRevoked && username != null) {
                     String roles = claims.get("roles", String.class);
-                    List<SimpleGrantedAuthority> authorities = List.of();
+                    List<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
 
                     if (StringUtils.hasText(roles)) {
-                        authorities = Arrays.stream(roles.split(","))
+                        Arrays.stream(roles.split(","))
                                 .filter(StringUtils::hasText)
                                 .flatMap(role -> {
                                     String clean = role.trim();
@@ -70,7 +70,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     );
                                 })
                                 .distinct()
-                                .collect(Collectors.toList());
+                                .forEach(authorities::add);
+                    }
+
+                    String orgIdsClaim = claims.get("orgIds", String.class);
+                    if (StringUtils.hasText(orgIdsClaim)) {
+                        for (String oid : orgIdsClaim.split(",")) {
+                            String clean = oid.trim().toLowerCase();
+                            if (!clean.isEmpty()) {
+                                authorities.add(new SimpleGrantedAuthority("ORG_" + clean));
+                            }
+                        }
                     }
 
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(

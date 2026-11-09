@@ -277,9 +277,23 @@ public class CashBankService {
             Integer count5s, Integer count1s, Integer count1cs, String status, UUID operationId,
             UUID shiftId, UUID gateId, String deviceId, UUID parentCashBankId,
             UUID processId, UUID personStickerId, String createdBy, Instant createdAt, String updatedBy, Instant updatedAt) {
+        return searchCashBanks(
+                cashBankId, bankName, startingAmount, officialCount, count100s, count50s,
+                count20s, count10s, count5s, count1s, count1cs, status, operationId, null,
+                shiftId, gateId, deviceId, parentCashBankId, processId, personStickerId,
+                createdBy, createdAt, updatedBy, updatedAt);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CashBank> searchCashBanks(
+            UUID cashBankId, String bankName, BigDecimal startingAmount, BigDecimal officialCount,
+            Integer count100s, Integer count50s, Integer count20s, Integer count10s,
+            Integer count5s, Integer count1s, Integer count1cs, String status, UUID operationId, UUID orgId,
+            UUID shiftId, UUID gateId, String deviceId, UUID parentCashBankId,
+            UUID processId, UUID personStickerId, String createdBy, Instant createdAt, String updatedBy, Instant updatedAt) {
         Specification<CashBank> spec = CashBankSpecification.search(
                 cashBankId, bankName, startingAmount, officialCount, count100s, count50s,
-                count20s, count10s, count5s, count1s, count1cs, status, operationId, shiftId, gateId,
+                count20s, count10s, count5s, count1s, count1cs, status, operationId, orgId, shiftId, gateId,
                 deviceId, parentCashBankId, processId, personStickerId, createdBy, createdAt, updatedBy, updatedAt);
         return cashBankRepository.findAll(spec);
     }

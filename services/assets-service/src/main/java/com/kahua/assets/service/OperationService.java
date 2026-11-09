@@ -100,6 +100,11 @@ public class OperationService {
     }
 
     @Transactional(readOnly = true)
+    public Operation getOperationById(UUID operationId) {
+        return operationRepository.findById(operationId).orElse(null);
+    }
+
+    @Transactional(readOnly = true)
     public List<Operation> searchOperations(
             UUID operationId, UUID orgId, String name, LocalDate startDate, LocalDate endDate,
             String locationName, Boolean isActive, BigDecimal ticketPrice, BigDecimal ccFee,

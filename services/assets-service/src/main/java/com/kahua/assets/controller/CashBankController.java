@@ -47,6 +47,8 @@ public class CashBankController {
 
     @GetMapping
     public ResponseEntity<List<CashBank>> getCashBanks(
+            @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader,
+            @RequestParam(required = false) UUID orgId,
             @RequestParam(required = false) UUID cashBankId,
             @RequestParam(required = false) String bankName,
             @RequestParam(required = false) BigDecimal startingAmount,
@@ -71,9 +73,13 @@ public class CashBankController {
             @RequestParam(required = false) String updatedBy,
             @RequestParam(required = false) Instant updatedAt) {
 
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        String targetOrgStr = (orgId != null) ? orgId.toString() : orgIdHeader;
+        UUID effectiveOrgId = com.kuleanasystems.security.TenantSecurityUtil.resolveEffectiveOrgId(targetOrgStr, auth);
+
         List<CashBank> cashBanks = cashBankService.searchCashBanks(
                 cashBankId, bankName, startingAmount, officialCount, count100s, count50s,
-                count20s, count10s, count5s, count1s, count1cs, status, operationId, shiftId, gateId,
+                count20s, count10s, count5s, count1s, count1cs, status, operationId, effectiveOrgId, shiftId, gateId,
                 deviceId, parentCashBankId, processId, personStickerId, createdBy, createdAt, updatedBy, updatedAt);
 
         if (shiftId != null) {

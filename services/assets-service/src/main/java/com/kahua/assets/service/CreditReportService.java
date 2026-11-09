@@ -141,8 +141,19 @@ public class CreditReportService {
             UUID creditReportId, BigDecimal totalAmount, UUID operationId, UUID shiftId,
             UUID gateId, String deviceId, UUID processId, UUID personStickerId, String createdBy,
             Instant createdAt, String updatedBy, Instant updatedAt) {
+        return searchCreditReports(
+                creditReportId, totalAmount, operationId, null, shiftId,
+                gateId, deviceId, processId, personStickerId, createdBy,
+                createdAt, updatedBy, updatedAt);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CreditReport> searchCreditReports(
+            UUID creditReportId, BigDecimal totalAmount, UUID operationId, UUID orgId, UUID shiftId,
+            UUID gateId, String deviceId, UUID processId, UUID personStickerId, String createdBy,
+            Instant createdAt, String updatedBy, Instant updatedAt) {
         Specification<CreditReport> spec = CreditReportSpecification.search(
-                creditReportId, totalAmount, operationId, shiftId, gateId,
+                creditReportId, totalAmount, operationId, orgId, shiftId, gateId,
                 deviceId, processId, personStickerId, createdBy, createdAt, updatedBy, updatedAt);
         return creditReportRepository.findAll(spec);
     }

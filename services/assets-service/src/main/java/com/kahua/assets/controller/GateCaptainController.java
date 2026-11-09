@@ -43,28 +43,16 @@ public class GateCaptainController {
             @RequestParam(required = false) UUID gateId,
             @RequestParam(required = false) UUID operationId,
             @RequestParam(required = false) UUID shiftId,
+            @RequestParam(required = false) UUID orgId,
             @RequestParam(required = false) String createdBy,
             @RequestParam(required = false) Instant createdAt,
             @RequestParam(required = false) String updatedBy,
             @RequestParam(required = false) Instant updatedAt,
             @RequestHeader(value = "X-Org-Id", required = false) String orgIdHeader) {
 
-        UUID effectiveOrgId = null;
-        if (orgIdHeader != null && !orgIdHeader.trim().isEmpty() && !"all".equalsIgnoreCase(orgIdHeader.trim())) {
-            try {
-                effectiveOrgId = UUID.fromString(orgIdHeader.trim());
-            } catch (IllegalArgumentException ignored) {
-            }
-        }
-
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean isSuperAdmin = auth != null && auth.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(a -> a.equals("ROLE_SUPERADMIN") || a.equals("SUPERADMIN"));
-
-        if ("all".equalsIgnoreCase(orgIdHeader) && isSuperAdmin) {
-            effectiveOrgId = null;
-        }
+        String targetOrgStr = (orgId != null) ? orgId.toString() : orgIdHeader;
+        UUID effectiveOrgId = com.kuleanasystems.security.TenantSecurityUtil.resolveEffectiveOrgId(targetOrgStr, auth);
 
         List<GateCaptain> gateCaptains = gateCaptainService.searchGateCaptains(
                 gateCaptainId, captainName, gateId, operationId, shiftId, effectiveOrgId,

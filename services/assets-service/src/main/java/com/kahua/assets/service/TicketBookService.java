@@ -392,9 +392,21 @@ public class TicketBookService {
             Integer nextTicket, Boolean isReusable, String status, UUID operationId,
             UUID shiftId, UUID gateId, String deviceId, UUID parentTicketBookId,
             UUID processId, UUID personStickerId, String createdBy, Instant createdAt, String updatedBy, Instant updatedAt) {
+        return searchTicketBooks(
+                ticketBookId, scanCode, startNum, endNum, nextTicket, isReusable, status,
+                operationId, null, shiftId, gateId, deviceId, parentTicketBookId,
+                processId, personStickerId, createdBy, createdAt, updatedBy, updatedAt);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TicketBook> searchTicketBooks(
+            UUID ticketBookId, String scanCode, Integer startNum, Integer endNum,
+            Integer nextTicket, Boolean isReusable, String status, UUID operationId, UUID orgId,
+            UUID shiftId, UUID gateId, String deviceId, UUID parentTicketBookId,
+            UUID processId, UUID personStickerId, String createdBy, Instant createdAt, String updatedBy, Instant updatedAt) {
         Specification<TicketBook> spec = TicketBookSpecification.search(
                 ticketBookId, scanCode, startNum, endNum, nextTicket, isReusable, status,
-                operationId, shiftId, gateId, deviceId, parentTicketBookId, processId, personStickerId,
+                operationId, orgId, shiftId, gateId, deviceId, parentTicketBookId, processId, personStickerId,
                 createdBy, createdAt, updatedBy, updatedAt);
         return ticketBookRepository.findAll(spec);
     }
