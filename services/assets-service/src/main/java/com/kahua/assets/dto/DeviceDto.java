@@ -18,6 +18,7 @@ import java.util.UUID;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DeviceDto {
     private UUID id;
+    private UUID orgId;
     private String deviceId;
     private String deviceNumber;
     private Boolean isActive;

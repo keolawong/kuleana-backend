@@ -15,8 +15,8 @@ import java.util.UUID;
 @Builder
 @Entity
 @Table(name = "device", schema = "asset", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_device_id", columnNames = {"device_id"}),
-        @UniqueConstraint(name = "uq_device_number", columnNames = {"device_number"})
+        @UniqueConstraint(name = "uq_device_id_org", columnNames = {"device_id", "org_id"}),
+        @UniqueConstraint(name = "uq_device_number_org", columnNames = {"device_number", "org_id"})
 })
 public class Device {
 
@@ -24,6 +24,9 @@ public class Device {
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "id", nullable = false)
     private UUID id;
+
+    @Column(name = "org_id", nullable = false)
+    private UUID orgId;
 
     @Column(name = "device_id", nullable = false, length = 100)
     private String deviceId;

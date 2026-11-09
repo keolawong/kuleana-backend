@@ -33,7 +33,8 @@ public class AssetController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to operation's assets");
         }
 
-        AssetSearchResponseDto assets = assetService.searchAssets(operationId, search);
+        UUID orgId = op != null ? op.getOrgId() : null;
+        AssetSearchResponseDto assets = assetService.searchAssets(operationId, search, orgId);
 
         if ((assets.getCashBank() == null || assets.getCashBank().isEmpty()) &&
             (assets.getTicketBook() == null || assets.getTicketBook().isEmpty()) &&

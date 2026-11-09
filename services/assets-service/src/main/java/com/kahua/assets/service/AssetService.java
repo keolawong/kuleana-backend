@@ -32,6 +32,11 @@ public class AssetService {
 
     @Transactional(readOnly = true)
     public AssetSearchResponseDto searchAssets(UUID operationId, String search) {
+        return searchAssets(operationId, search, null);
+    }
+
+    @Transactional(readOnly = true)
+    public AssetSearchResponseDto searchAssets(UUID operationId, String search, UUID orgId) {
         AssetSearchResponseDto response = new AssetSearchResponseDto();
 
         // Search CashBanks
@@ -44,8 +49,8 @@ public class AssetService {
         List<TicketBook> ticketBooks = ticketBookRepository.findAll(ticketBookSpec);
         response.setTicketBook(ticketBooks.stream().map(this::mapToTicketBookDto).collect(Collectors.toList()));
 
-        // Search Devices (active)
-        Specification<Device> deviceSpec = DeviceSpecification.search(search, true);
+        // Search Devices (active, org-scoped if provided)
+        Specification<Device> deviceSpec = DeviceSpecification.search(search, true, orgId);
         List<Device> devices = deviceRepository.findAll(deviceSpec);
         response.setDevice(devices.stream().map(this::mapToDeviceDto).collect(Collectors.toList()));
 
@@ -96,6 +101,7 @@ public class AssetService {
     private DeviceDto mapToDeviceDto(Device device) {
         DeviceDto dto = new DeviceDto();
         dto.setId(device.getId());
+        dto.setOrgId(device.getOrgId());
         dto.setDeviceId(device.getDeviceId());
         dto.setDeviceNumber(device.getDeviceNumber());
         dto.setIsActive(device.getIsActive());
