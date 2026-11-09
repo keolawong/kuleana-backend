@@ -18,6 +18,8 @@ import java.util.UUID;
 public class OperationDto {
     private UUID orgId;
 
+    private UUID templateOperationId;
+
     @NotBlank(message = "Name is required")
     private String name;
 

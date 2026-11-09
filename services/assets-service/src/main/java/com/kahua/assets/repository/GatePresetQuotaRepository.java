@@ -12,4 +12,6 @@ import java.util.UUID;
 public interface GatePresetQuotaRepository extends JpaRepository<GatePresetQuota, UUID> {
     List<GatePresetQuota> findByPresetTypeIgnoreCase(String presetType);
     Optional<GatePresetQuota> findByPresetTypeIgnoreCaseAndGate_GateIdAndJobRole(String presetType, UUID gateId, String jobRole);
+    List<GatePresetQuota> findByGate_GateId(UUID gateId);
+    List<GatePresetQuota> findByGate_Operation_OperationId(UUID operationId);
 }

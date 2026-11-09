@@ -2,7 +2,11 @@ package com.kahua.assets.service;
 
 import com.kahua.assets.dto.OperationDto;
 import com.kahua.assets.dto.OperationPatchDto;
+import com.kahua.assets.entity.Gate;
+import com.kahua.assets.entity.GatePresetQuota;
 import com.kahua.assets.entity.Operation;
+import com.kahua.assets.repository.GatePresetQuotaRepository;
+import com.kahua.assets.repository.GateRepository;
 import com.kahua.assets.repository.OperationRepository;
 import com.kahua.assets.repository.OperationSpecification;
 import jakarta.persistence.EntityNotFoundException;
@@ -24,6 +28,8 @@ public class OperationService {
     private static final UUID DEFAULT_ORG_ID = UUID.fromString("b0000000-0000-0000-0000-000000000002");
 
     private final OperationRepository operationRepository;
+    private final GateRepository gateRepository;
+    private final GatePresetQuotaRepository gatePresetQuotaRepository;
 
     @Transactional
     public Operation createOperation(OperationDto dto) {
@@ -52,11 +58,45 @@ public class OperationService {
             operation.setCcFeeType(dto.getCcFeeType());
         }
 
-        // Normally you would fetch this from the SecurityContext
         String currentUser = "System"; 
         operation.setCreatedBy(currentUser);
 
-        return operationRepository.save(operation);
+        Operation savedOperation = operationRepository.save(operation);
+
+        if (dto.getTemplateOperationId() != null) {
+            cloneGatesAndQuotas(dto.getTemplateOperationId(), savedOperation);
+        }
+
+        return savedOperation;
+    }
+
+    private void cloneGatesAndQuotas(UUID templateOperationId, Operation targetOperation) {
+        List<Gate> sourceGates = gateRepository.findByOperation_OperationIdOrderByDisplayOrderAscNameAsc(templateOperationId);
+        for (Gate sourceGate : sourceGates) {
+            Gate newGate = new Gate();
+            newGate.setOperation(targetOperation);
+            newGate.setName(sourceGate.getName());
+            newGate.setIsActive(sourceGate.getIsActive());
+            newGate.setCashBanksRequiredForBusy(sourceGate.getCashBanksRequiredForBusy());
+            newGate.setCashBanksRequiredForModerate(sourceGate.getCashBanksRequiredForModerate());
+            newGate.setCashBanksRequiredForLite(sourceGate.getCashBanksRequiredForLite());
+            newGate.setDisplayOrder(sourceGate.getDisplayOrder());
+            newGate.setCreatedBy("Template Clone");
+            Gate savedGate = gateRepository.save(newGate);
+
+            List<GatePresetQuota> sourceQuotas = gatePresetQuotaRepository.findByGate_GateId(sourceGate.getGateId());
+            for (GatePresetQuota sourceQuota : sourceQuotas) {
+                GatePresetQuota newQuota = new GatePresetQuota();
+                newQuota.setPresetType(sourceQuota.getPresetType());
+                newQuota.setGate(savedGate);
+                newQuota.setJobRole(sourceQuota.getJobRole());
+                newQuota.setPlannedWorkers(sourceQuota.getPlannedWorkers());
+                newQuota.setMinWorkers(sourceQuota.getMinWorkers());
+                newQuota.setHappyWorkers(sourceQuota.getHappyWorkers());
+                newQuota.setPriority(sourceQuota.getPriority());
+                gatePresetQuotaRepository.save(newQuota);
+            }
+        }
     }
 
     @Transactional
@@ -92,7 +132,6 @@ public class OperationService {
             operation.setCcFeeType(dto.getCcFeeType());
         }
 
-        // Normally you would fetch this from the SecurityContext
         String currentUser = "System";
         operation.setUpdatedBy(currentUser);
 

@@ -11,4 +11,6 @@ import java.util.UUID;
 @Repository
 public interface GateRepository extends JpaRepository<Gate, UUID>, JpaSpecificationExecutor<Gate> {
     List<Gate> findByIsActiveTrueOrderByDisplayOrderAscNameAsc();
+    List<Gate> findByOperation_OperationId(UUID operationId);
+    List<Gate> findByOperation_OperationIdOrderByDisplayOrderAscNameAsc(UUID operationId);
 }
