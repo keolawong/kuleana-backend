@@ -26,6 +26,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PersonService {
 
+    private static final UUID DEFAULT_ORG_ID = UUID.fromString("b0000000-0000-0000-0000-000000000002");
+
     private final PersonRepository personRepository;
     private final ShiftRepository shiftRepository;
     private final GateRepository gateRepository;
@@ -34,6 +36,7 @@ public class PersonService {
     @Transactional
     public Person createPerson(PersonDto dto) {
         Person person = new Person();
+        person.setOrgId(dto.getOrgId() != null ? dto.getOrgId() : DEFAULT_ORG_ID);
         applyNormalizedNames(person, dto.getFirstName(), dto.getLastName());
         person.setNotes(dto.getNotes());
         person.setExternalId(dto.getExternalId());
@@ -51,6 +54,7 @@ public class PersonService {
 
         for (PersonBulkDto dto : dtos) {
             Person person = new Person();
+            person.setOrgId(dto.getOrgId() != null ? dto.getOrgId() : DEFAULT_ORG_ID);
             applyNormalizedNames(person, dto.getFirstName(), dto.getLastName());
             person.setNotes(dto.getNotes());
             person.setExternalId(dto.getExternalId());
@@ -109,6 +113,9 @@ public class PersonService {
         Person person = personRepository.findById(personId)
                 .orElseThrow(() -> new EntityNotFoundException("Person not found with id: " + personId));
 
+        if (dto.isDirty("orgId") && dto.getOrgId() != null) {
+            person.setOrgId(dto.getOrgId());
+        }
         if (dto.isDirty("firstName")) {
             person.setFirstName(dto.getFirstName());
         }
@@ -157,14 +164,30 @@ public class PersonService {
 
     @Transactional(readOnly = true)
     public List<Person> searchPersons(
-            UUID personId, String firstName, String lastName, String notes, String externalId,
+            UUID personId, UUID orgId, String firstName, String lastName, String notes, String externalId,
             UUID shiftId, UUID gateId, String organization, String jobRole, Boolean isActive,
             String createdBy, Instant createdAt, String updatedBy, Instant updatedAt) {
         Specification<Person> spec = PersonSpecification.search(
-                personId, firstName, lastName, notes, externalId,
+                personId, orgId, firstName, lastName, notes, externalId,
                 shiftId, gateId, organization, jobRole, isActive,
                 createdBy, createdAt, updatedBy, updatedAt);
         return personRepository.findAll(spec);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Person> searchPersons(
+            UUID personId, String firstName, String lastName, String notes, String externalId,
+            UUID shiftId, UUID gateId, String organization, String jobRole, Boolean isActive,
+            String createdBy, Instant createdAt, String updatedBy, Instant updatedAt) {
+        return searchPersons(personId, null, firstName, lastName, notes, externalId,
+                shiftId, gateId, organization, jobRole, isActive,
+                createdBy, createdAt, updatedBy, updatedAt);
+    }
+
+    @Transactional(readOnly = true)
+    public Person getPersonById(UUID personId) {
+        return personRepository.findById(personId)
+                .orElseThrow(() -> new EntityNotFoundException("Person not found with id: " + personId));
     }
 
     private static final String UNIQUE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";

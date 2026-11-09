@@ -21,6 +21,9 @@ public class Person {
     @Column(name = "person_id", nullable = false)
     private UUID personId;
 
+    @Column(name = "org_id", nullable = false)
+    private UUID orgId;
+
     @Column(name = "first_name", nullable = true, length = 100)
     private String firstName;
 

@@ -15,12 +15,24 @@ public class PersonSpecification {
             UUID personId, String firstName, String lastName, String notes, String externalId,
             UUID shiftId, UUID gateId, String organization, String jobRole, Boolean isActive,
             String createdBy, Instant createdAt, String updatedBy, Instant updatedAt) {
+        return search(personId, null, firstName, lastName, notes, externalId,
+                shiftId, gateId, organization, jobRole, isActive,
+                createdBy, createdAt, updatedBy, updatedAt);
+    }
+
+    public static Specification<Person> search(
+            UUID personId, UUID orgId, String firstName, String lastName, String notes, String externalId,
+            UUID shiftId, UUID gateId, String organization, String jobRole, Boolean isActive,
+            String createdBy, Instant createdAt, String updatedBy, Instant updatedAt) {
 
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
             if (personId != null) {
                 predicates.add(cb.equal(root.get("personId"), personId));
+            }
+            if (orgId != null) {
+                predicates.add(cb.equal(root.get("orgId"), orgId));
             }
             if (shiftId != null) {
                 predicates.add(cb.equal(root.join("shift").get("shiftId"), shiftId));

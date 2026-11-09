@@ -6,11 +6,15 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Data
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PersonBulkDto {
+    private UUID orgId;
+
     private String firstName;
 
     private String lastName;
@@ -21,9 +25,9 @@ public class PersonBulkDto {
 
     private boolean generateSticker;
 
-    private java.util.UUID shiftId;
+    private UUID shiftId;
 
-    private java.util.UUID gateId;
+    private UUID gateId;
 
     private String organization;
 

@@ -6,11 +6,15 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Data
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PersonDto {
+    private UUID orgId;
+
     private String firstName;
 
     private String lastName;

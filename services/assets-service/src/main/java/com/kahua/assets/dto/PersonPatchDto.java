@@ -7,24 +7,31 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 @Data
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PersonPatchDto {
+    private UUID orgId;
     private String firstName;
     private String lastName;
     private String notes;
     private String externalId;
-    private java.util.UUID shiftId;
-    private java.util.UUID gateId;
+    private UUID shiftId;
+    private UUID gateId;
     private String organization;
     private String jobRole;
     private Boolean isActive;
 
     @JsonIgnore
     private final Set<String> dirtyFields = new HashSet<>();
+
+    public void setOrgId(UUID orgId) {
+        this.orgId = orgId;
+        this.dirtyFields.add("orgId");
+    }
 
     public void setFirstName(String firstName) {
         this.firstName = firstName;
@@ -46,12 +53,12 @@ public class PersonPatchDto {
         this.dirtyFields.add("externalId");
     }
 
-    public void setShiftId(java.util.UUID shiftId) {
+    public void setShiftId(UUID shiftId) {
         this.shiftId = shiftId;
         this.dirtyFields.add("shiftId");
     }
 
-    public void setGateId(java.util.UUID gateId) {
+    public void setGateId(UUID gateId) {
         this.gateId = gateId;
         this.dirtyFields.add("gateId");
     }

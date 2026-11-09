@@ -22,7 +22,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DeviceService {
 
-    private static final UUID DEFAULT_ORG_ID = UUID.fromString("a0000000-0000-0000-0000-000000000001");
+    private static final UUID DEFAULT_ORG_ID = UUID.fromString("b0000000-0000-0000-0000-000000000002");
 
     private final DeviceRepository deviceRepository;
     private final CashBankRepository cashBankRepository;
