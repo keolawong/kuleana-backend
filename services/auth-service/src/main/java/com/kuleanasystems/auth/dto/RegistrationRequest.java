@@ -15,6 +15,8 @@ public class RegistrationRequest {
     private String organizationName;
     private String organizationSlug;
     private String inviteCode;
+    private String appName;
+    private String captchaToken;
 
     @JsonAlias({"questions"})
     private List<SecurityQuestionDto> securityQuestions;

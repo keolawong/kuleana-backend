@@ -95,6 +95,66 @@ public class AuthController {
     @Autowired(required = false)
     private AdminScopeService adminScopeService;
 
+    @Autowired(required = false)
+    private com.kuleanasystems.auth.repository.AppRegistrationConfigRepository appRegistrationConfigRepository;
+
+    @Autowired
+    private com.kuleanasystems.auth.service.CaptchaVerificationService captchaVerificationService;
+
+    @org.springframework.beans.factory.annotation.Value("${security.captcha.turnstile.site-key:1x00000000000000000000AA}")
+    private String turnstileSiteKey;
+
+    @GetMapping("/registration-config")
+    public ResponseEntity<?> getRegistrationConfig(
+            @RequestParam(required = false) String app,
+            @RequestParam(required = false) String org) {
+        
+        String targetApp = (app != null && !app.isBlank()) ? app.trim().toLowerCase() : "assets";
+        var configOpt = appRegistrationConfigRepository != null 
+                ? appRegistrationConfigRepository.findByAppName(targetApp) 
+                : Optional.<com.kuleanasystems.auth.entity.AppRegistrationConfig>empty();
+
+        String displayTitle = "Kuleana Ecosystem";
+        boolean requireCaptcha = true;
+        List<String> defaultRoles = List.of("viewer");
+
+        if (configOpt.isPresent()) {
+            var cfg = configOpt.get();
+            displayTitle = cfg.getDisplayTitle();
+            requireCaptcha = Boolean.TRUE.equals(cfg.getRequireCaptcha());
+            if (cfg.getDefaultRoles() != null && !cfg.getDefaultRoles().isEmpty()) {
+                defaultRoles = cfg.getDefaultRoles();
+            }
+        }
+
+        String orgSlug = null;
+        String orgName = null;
+        boolean allowReg = true;
+
+        if (org != null && !org.isBlank() && organizationRepository != null) {
+            var foundOrg = organizationRepository.findBySlug(org.trim().toLowerCase());
+            if (foundOrg.isPresent()) {
+                var o = foundOrg.get();
+                orgSlug = o.getSlug();
+                orgName = o.getName();
+                allowReg = !Boolean.FALSE.equals(o.getAllowPublicRegistration());
+            }
+        }
+
+        var response = com.kuleanasystems.auth.dto.RegistrationConfigResponse.builder()
+                .appName(targetApp)
+                .displayTitle(displayTitle)
+                .requireCaptcha(requireCaptcha)
+                .turnstileSiteKey(turnstileSiteKey)
+                .organizationSlug(orgSlug)
+                .organizationName(orgName)
+                .defaultRoles(defaultRoles)
+                .allowRegistration(allowReg)
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
         User user = userRepository.findByUsername(loginRequest.getUsername()).orElse(null);
@@ -210,9 +270,34 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@RequestBody RegistrationRequest request) {
+    @jakarta.transaction.Transactional
+    public ResponseEntity<?> registerUser(@RequestBody RegistrationRequest request, HttpServletRequest servletRequest) {
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
             return ResponseEntity.badRequest().body("Error: Username is already taken!");
+        }
+
+        // Validate Captcha
+        String targetApp = (request.getAppName() != null && !request.getAppName().isBlank()) 
+                ? request.getAppName().trim().toLowerCase() : "assets";
+        boolean checkCaptcha = true;
+        if (appRegistrationConfigRepository != null) {
+            checkCaptcha = appRegistrationConfigRepository.findByAppName(targetApp)
+                    .map(com.kuleanasystems.auth.entity.AppRegistrationConfig::getRequireCaptcha)
+                    .orElse(true);
+        }
+
+        if (checkCaptcha) {
+            String clientIp = servletRequest.getHeader("X-Forwarded-For");
+            if (clientIp != null && clientIp.contains(",")) {
+                clientIp = clientIp.split(",")[0].trim();
+            }
+            if (clientIp == null || clientIp.isBlank()) {
+                clientIp = servletRequest.getRemoteAddr();
+            }
+            boolean captchaPassed = captchaVerificationService.verifyCaptcha(request.getCaptchaToken(), clientIp);
+            if (!captchaPassed) {
+                return ResponseEntity.badRequest().body("Error: Captcha verification failed. Please try again.");
+            }
         }
 
         try {
@@ -226,60 +311,59 @@ public class AuthController {
         }
 
         User user = User.builder()
-                .username(request.getUsername())
+                .username(request.getUsername().trim())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
+                .firstName(request.getFirstName().trim())
+                .lastName(request.getLastName().trim())
                 .build();
 
         List<UserSecurityQuestion> questions = new ArrayList<>();
         for (RegistrationRequest.SecurityQuestionDto q : request.getSecurityQuestions()) {
             questions.add(UserSecurityQuestion.builder()
                 .user(user)
-                .question(q.getQuestion())
-                .answerHash(passwordEncoder.encode(q.getAnswer().toLowerCase()))
+                .question(q.getQuestion().trim())
+                .answerHash(passwordEncoder.encode(q.getAnswer().trim().toLowerCase()))
                 .build());
         }
         user.setSecurityQuestions(questions);
 
         userRepository.save(user);
 
-        if (userApplicationRepository != null) {
-            userApplicationRepository.save(UserApplication.builder()
-                    .userId(user.getId())
-                    .appName("assets")
-                    .status("active")
-                    .primaryRole("OPERATOR")
-                    .build());
-        }
+        // Sub-application assignment with default roles
+        String primaryRole = "VIEWER";
+        Set<String> rolesToAssign = new HashSet<>();
 
-        if (userApplicationRepository != null) {
-            userApplicationRepository.save(UserApplication.builder()
-                    .userId(user.getId())
-                    .appName("tracker")
-                    .status("active")
-                    .primaryRole("VIEWER")
-                    .build());
-        }
-
-        if (userRoleRepository != null && roleRepository != null) {
-            List<String> defaultRoles = List.of("ASSET-READ", "ASSET-WRITE", "viewer");
-            List<UserRole> rolesList = new ArrayList<>();
-            for (String rName : defaultRoles) {
-                roleRepository.findByName(rName).ifPresent(role -> {
-                    rolesList.add(UserRole.builder()
-                            .userId(user.getId())
-                            .roleId(role.getId())
-                            .status("active")
-                            .build());
-                });
-            }
-            if (!rolesList.isEmpty()) {
-                userRoleRepository.saveAll(rolesList);
+        if (appRegistrationConfigRepository != null) {
+            var appConfig = appRegistrationConfigRepository.findByAppName(targetApp);
+            if (appConfig.isPresent()) {
+                primaryRole = appConfig.get().getDefaultPrimaryRole();
+                if (appConfig.get().getDefaultRoles() != null) {
+                    rolesToAssign.addAll(appConfig.get().getDefaultRoles());
+                }
             }
         }
 
-        // Organization assignment / creation
+        if (userApplicationRepository != null) {
+            userApplicationRepository.save(UserApplication.builder()
+                    .userId(user.getId())
+                    .appName(targetApp)
+                    .status("active")
+                    .primaryRole(primaryRole)
+                    .build());
+            
+            // Also ensure default entry for complementary app if needed
+            if (!"assets".equals(targetApp)) {
+                userApplicationRepository.save(UserApplication.builder()
+                        .userId(user.getId())
+                        .appName("assets")
+                        .status("active")
+                        .primaryRole("OPERATOR")
+                        .build());
+            }
+        }
+
+        // Organization assignment / creation with org-specific default roles
+        Organization targetOrg = null;
         if (userOrganizationRepository != null && organizationRepository != null) {
             String orgName = request.getOrganizationName() != null ? request.getOrganizationName().trim() : "";
             String orgSlug = request.getOrganizationSlug() != null ? request.getOrganizationSlug().trim().toLowerCase() : "";
@@ -289,17 +373,20 @@ public class AuthController {
                     orgSlug = orgName.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
                 }
                 Optional<Organization> existingOrg = organizationRepository.findBySlug(orgSlug);
-                Organization targetOrg;
                 String userOrgRole;
 
                 if (existingOrg.isPresent()) {
                     targetOrg = existingOrg.get();
+                    if (Boolean.FALSE.equals(targetOrg.getAllowPublicRegistration())) {
+                        throw new RuntimeException("Public registration is disabled for this organization.");
+                    }
                     userOrgRole = "MEMBER";
                 } else {
                     targetOrg = organizationRepository.save(Organization.builder()
                             .slug(orgSlug)
                             .name(!orgName.isEmpty() ? orgName : orgSlug)
                             .status("active")
+                            .allowPublicRegistration(true)
                             .build());
                     userOrgRole = "ORG_ADMIN";
                 }
@@ -312,13 +399,56 @@ public class AuthController {
             } else {
                 // Link to default organization so user is never orphaned
                 UUID defaultOrgId = UUID.fromString("a0000000-0000-0000-0000-000000000001");
-                organizationRepository.findById(defaultOrgId).ifPresent(defaultOrg -> {
+                var defaultOrgOpt = organizationRepository.findById(defaultOrgId);
+                if (defaultOrgOpt.isPresent()) {
+                    targetOrg = defaultOrgOpt.get();
                     userOrganizationRepository.save(UserOrganization.builder()
                             .userId(user.getId())
-                            .orgId(defaultOrg.getId())
+                            .orgId(targetOrg.getId())
                             .role("MEMBER")
                             .build());
+                }
+            }
+        }
+
+        // Extract organization default application roles if available
+        if (targetOrg != null && targetOrg.getDefaultApplicationRoles() != null) {
+            var orgRolesJson = targetOrg.getDefaultApplicationRoles();
+            if (orgRolesJson.has(targetApp) && orgRolesJson.get(targetApp).isArray()) {
+                for (var element : orgRolesJson.get(targetApp)) {
+                    rolesToAssign.add(element.asText());
+                }
+            }
+        }
+
+        // Fallback default roles if empty
+        if (rolesToAssign.isEmpty()) {
+            if ("assets".equals(targetApp)) {
+                rolesToAssign.addAll(List.of("ASSET-READ", "ASSET-WRITE", "viewer"));
+            } else {
+                rolesToAssign.add("viewer");
+            }
+        }
+
+        // Assign User Roles (Normalizing role names uppercase / trimmed)
+        if (userRoleRepository != null && roleRepository != null) {
+            List<UserRole> rolesList = new ArrayList<>();
+            for (String rName : rolesToAssign) {
+                String normalized = rName.trim().toUpperCase();
+                // Prevent escalation to admin/superadmin via registration defaults
+                if (normalized.contains("ADMIN") || normalized.contains("SUPER") || normalized.contains("OWNER")) {
+                    continue;
+                }
+                roleRepository.findByName(normalized).or(() -> roleRepository.findByName(rName)).ifPresent(role -> {
+                    rolesList.add(UserRole.builder()
+                            .userId(user.getId())
+                            .roleId(role.getId())
+                            .status("active")
+                            .build());
                 });
+            }
+            if (!rolesList.isEmpty()) {
+                userRoleRepository.saveAll(rolesList);
             }
         }
 
