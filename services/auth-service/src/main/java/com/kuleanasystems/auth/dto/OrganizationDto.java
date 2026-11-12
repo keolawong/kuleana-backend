@@ -22,6 +22,7 @@ public class OrganizationDto {
     private String logoUrl;
     private String status;
     private String role;
+    private Boolean isDefault;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

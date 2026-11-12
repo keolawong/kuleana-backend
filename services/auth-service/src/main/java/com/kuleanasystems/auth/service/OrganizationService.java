@@ -326,6 +326,38 @@ public class OrganizationService {
         userOrganizationRepository.deleteByUserIdAndOrgId(userId, orgId);
     }
 
+    @Transactional
+    public OrganizationDto setDefaultOrganization(UUID orgId, Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated");
+        }
+
+        boolean isSuper = adminScopeService != null && adminScopeService.isSuperAdmin(authentication);
+        if (!isSuper) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only super administrators can set the default organization");
+        }
+
+        Organization targetOrg = organizationRepository.findById(orgId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found"));
+
+        // Unset any existing default
+        List<Organization> existingDefaults = organizationRepository.findAll().stream()
+                .filter(o -> Boolean.TRUE.equals(o.getIsDefault()))
+                .collect(Collectors.toList());
+        for (Organization o : existingDefaults) {
+            o.setIsDefault(false);
+        }
+        if (!existingDefaults.isEmpty()) {
+            organizationRepository.saveAll(existingDefaults);
+            organizationRepository.flush();
+        }
+
+        targetOrg.setIsDefault(true);
+        Organization saved = organizationRepository.save(targetOrg);
+
+        return toDto(saved, "ORG_ADMIN");
+    }
+
     public OrganizationDto toDto(Organization org, String role) {
         return OrganizationDto.builder()
                 .id(org.getId())
@@ -335,6 +367,7 @@ public class OrganizationService {
                 .logoUrl(org.getLogoUrl())
                 .status(org.getStatus())
                 .role(role)
+                .isDefault(Boolean.TRUE.equals(org.getIsDefault()))
                 .createdAt(org.getCreatedAt())
                 .updatedAt(org.getUpdatedAt())
                 .build();

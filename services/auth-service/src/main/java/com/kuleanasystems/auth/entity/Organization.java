@@ -46,6 +46,10 @@ public class Organization {
     private Boolean allowPublicRegistration = true;
 
     @Builder.Default
+    @Column(name = "is_default", nullable = false)
+    private Boolean isDefault = false;
+
+    @Builder.Default
     @Column(name = "default_active_status", length = 32)
     private String defaultActiveStatus = "active";
 
