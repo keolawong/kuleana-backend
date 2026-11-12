@@ -37,6 +37,22 @@ public class Organization {
     @Column(nullable = false, length = 32)
     private String status = "active";
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(name = "default_application_roles", columnDefinition = "jsonb")
+    private com.fasterxml.jackson.databind.JsonNode defaultApplicationRoles;
+
+    @Builder.Default
+    @Column(name = "allow_public_registration")
+    private Boolean allowPublicRegistration = true;
+
+    @Builder.Default
+    @Column(name = "is_default", nullable = false)
+    private Boolean isDefault = false;
+
+    @Builder.Default
+    @Column(name = "default_active_status", length = 32)
+    private String defaultActiveStatus = "active";
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;

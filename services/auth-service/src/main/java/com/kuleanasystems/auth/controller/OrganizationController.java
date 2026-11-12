@@ -44,6 +44,13 @@ public class OrganizationController {
         return ResponseEntity.ok(organizationService.updateOrganization(id, request, authentication));
     }
 
+    @PutMapping("/{id}/default")
+    public ResponseEntity<OrganizationDto> setDefaultOrganization(
+            @PathVariable UUID id,
+            Authentication authentication) {
+        return ResponseEntity.ok(organizationService.setDefaultOrganization(id, authentication));
+    }
+
     @GetMapping("/{id}/members")
     public ResponseEntity<List<UserOrganizationResponse>> getMembers(
             @PathVariable UUID id,

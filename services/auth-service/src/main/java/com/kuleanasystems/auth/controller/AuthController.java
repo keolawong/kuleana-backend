@@ -28,6 +28,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -94,6 +95,75 @@ public class AuthController {
 
     @Autowired(required = false)
     private AdminScopeService adminScopeService;
+
+    @Autowired(required = false)
+    private com.kuleanasystems.auth.repository.AppRegistrationConfigRepository appRegistrationConfigRepository;
+
+    @Autowired
+    private com.kuleanasystems.auth.service.CaptchaVerificationService captchaVerificationService;
+
+    @org.springframework.beans.factory.annotation.Value("${security.captcha.turnstile.site-key:1x00000000000000000000AA}")
+    private String turnstileSiteKey;
+
+    @GetMapping("/registration-config")
+    public ResponseEntity<?> getRegistrationConfig(
+            @RequestParam(required = false) String app,
+            @RequestParam(required = false) String org) {
+        
+        String targetApp = (app != null && !app.isBlank()) ? app.trim().toLowerCase() : "assets";
+        var configOpt = appRegistrationConfigRepository != null 
+                ? appRegistrationConfigRepository.findByAppName(targetApp) 
+                : Optional.<com.kuleanasystems.auth.entity.AppRegistrationConfig>empty();
+
+        String displayTitle = "Kuleana Ecosystem";
+        boolean requireCaptcha = true;
+        List<String> defaultRoles = List.of("viewer");
+
+        if (configOpt.isPresent()) {
+            var cfg = configOpt.get();
+            displayTitle = cfg.getDisplayTitle();
+            requireCaptcha = Boolean.TRUE.equals(cfg.getRequireCaptcha());
+            if (cfg.getDefaultRoles() != null && !cfg.getDefaultRoles().isEmpty()) {
+                defaultRoles = cfg.getDefaultRoles();
+            }
+        }
+
+        String orgSlug = null;
+        String orgName = null;
+        boolean allowReg = true;
+
+        if (organizationRepository != null) {
+            Optional<Organization> targetOrgOpt = Optional.empty();
+            if (org != null && !org.isBlank()) {
+                targetOrgOpt = organizationRepository.findBySlug(org.trim().toLowerCase());
+            }
+            if (targetOrgOpt.isEmpty()) {
+                targetOrgOpt = organizationRepository.findFirstByIsDefaultTrue()
+                        .or(() -> organizationRepository.findBySlug("default-org"))
+                        .or(() -> organizationRepository.findById(UUID.fromString("a0000000-0000-0000-0000-000000000001")));
+            }
+
+            if (targetOrgOpt.isPresent()) {
+                var o = targetOrgOpt.get();
+                orgSlug = o.getSlug();
+                orgName = o.getName();
+                allowReg = !Boolean.FALSE.equals(o.getAllowPublicRegistration());
+            }
+        }
+
+        var response = com.kuleanasystems.auth.dto.RegistrationConfigResponse.builder()
+                .appName(targetApp)
+                .displayTitle(displayTitle)
+                .requireCaptcha(requireCaptcha)
+                .turnstileSiteKey(turnstileSiteKey)
+                .organizationSlug(orgSlug)
+                .organizationName(orgName)
+                .defaultRoles(defaultRoles)
+                .allowRegistration(allowReg)
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
@@ -210,9 +280,38 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@RequestBody RegistrationRequest request) {
+    @jakarta.transaction.Transactional
+    public ResponseEntity<?> registerUser(@RequestBody RegistrationRequest request, HttpServletRequest servletRequest) {
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
-            return ResponseEntity.badRequest().body("Error: Username is already taken!");
+            Map<String, Object> conflictResp = new HashMap<>();
+            conflictResp.put("accountExists", true);
+            conflictResp.put("username", request.getUsername().trim());
+            conflictResp.put("message", "An account with username '" + request.getUsername().trim() + "' already exists in Kule Solutions.");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(conflictResp);
+        }
+
+        // Validate Captcha
+        String targetApp = (request.getAppName() != null && !request.getAppName().isBlank()) 
+                ? request.getAppName().trim().toLowerCase() : "assets";
+        boolean checkCaptcha = true;
+        if (appRegistrationConfigRepository != null) {
+            checkCaptcha = appRegistrationConfigRepository.findByAppName(targetApp)
+                    .map(com.kuleanasystems.auth.entity.AppRegistrationConfig::getRequireCaptcha)
+                    .orElse(true);
+        }
+
+        if (checkCaptcha) {
+            String clientIp = servletRequest.getHeader("X-Forwarded-For");
+            if (clientIp != null && clientIp.contains(",")) {
+                clientIp = clientIp.split(",")[0].trim();
+            }
+            if (clientIp == null || clientIp.isBlank()) {
+                clientIp = servletRequest.getRemoteAddr();
+            }
+            boolean captchaPassed = captchaVerificationService.verifyCaptcha(request.getCaptchaToken(), clientIp);
+            if (!captchaPassed) {
+                return ResponseEntity.badRequest().body("Error: Captcha verification failed. Please try again.");
+            }
         }
 
         try {
@@ -226,47 +325,114 @@ public class AuthController {
         }
 
         User user = User.builder()
-                .username(request.getUsername())
+                .username(request.getUsername().trim())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
+                .firstName(request.getFirstName().trim())
+                .lastName(request.getLastName().trim())
                 .build();
 
         List<UserSecurityQuestion> questions = new ArrayList<>();
         for (RegistrationRequest.SecurityQuestionDto q : request.getSecurityQuestions()) {
             questions.add(UserSecurityQuestion.builder()
                 .user(user)
-                .question(q.getQuestion())
-                .answerHash(passwordEncoder.encode(q.getAnswer().toLowerCase()))
+                .question(q.getQuestion().trim())
+                .answerHash(passwordEncoder.encode(q.getAnswer().trim().toLowerCase()))
                 .build());
         }
         user.setSecurityQuestions(questions);
 
         userRepository.save(user);
 
-        if (userApplicationRepository != null) {
-            userApplicationRepository.save(UserApplication.builder()
-                    .userId(user.getId())
-                    .appName("assets")
-                    .status("active")
-                    .primaryRole("OPERATOR")
-                    .build());
+        // Sub-application assignment with default roles
+        String primaryRole = "VIEWER";
+        Set<String> rolesToAssign = new HashSet<>();
+
+        if (appRegistrationConfigRepository != null) {
+            var appConfig = appRegistrationConfigRepository.findByAppName(targetApp);
+            if (appConfig.isPresent()) {
+                primaryRole = appConfig.get().getDefaultPrimaryRole();
+                if (appConfig.get().getDefaultRoles() != null) {
+                    rolesToAssign.addAll(appConfig.get().getDefaultRoles());
+                }
+            }
         }
 
         if (userApplicationRepository != null) {
             userApplicationRepository.save(UserApplication.builder()
                     .userId(user.getId())
-                    .appName("tracker")
+                    .appName(targetApp)
                     .status("active")
-                    .primaryRole("VIEWER")
+                    .primaryRole(primaryRole)
                     .build());
+            
+            // Also ensure default entry for complementary app if needed
+            if (!"assets".equals(targetApp)) {
+                userApplicationRepository.save(UserApplication.builder()
+                        .userId(user.getId())
+                        .appName("assets")
+                        .status("active")
+                        .primaryRole("OPERATOR")
+                        .build());
+            }
         }
 
+        // Organization assignment with org-specific default roles
+        Organization targetOrg = null;
+        if (userOrganizationRepository != null && organizationRepository != null) {
+            String orgSlug = request.getOrganizationSlug() != null ? request.getOrganizationSlug().trim().toLowerCase() : "";
+
+            if (!orgSlug.isEmpty()) {
+                targetOrg = organizationRepository.findBySlug(orgSlug).orElse(null);
+            }
+            if (targetOrg == null) {
+                targetOrg = organizationRepository.findFirstByIsDefaultTrue()
+                        .or(() -> organizationRepository.findBySlug("default-org"))
+                        .or(() -> organizationRepository.findById(UUID.fromString("a0000000-0000-0000-0000-000000000001")))
+                        .orElse(null);
+            }
+
+            if (targetOrg != null) {
+                if (Boolean.FALSE.equals(targetOrg.getAllowPublicRegistration())) {
+                    throw new RuntimeException("Public registration is disabled for this organization.");
+                }
+
+                userOrganizationRepository.save(UserOrganization.builder()
+                        .userId(user.getId())
+                        .orgId(targetOrg.getId())
+                        .role("MEMBER")
+                        .build());
+            }
+        }
+
+        // Extract organization default application roles if available
+        if (targetOrg != null && targetOrg.getDefaultApplicationRoles() != null) {
+            var orgRolesJson = targetOrg.getDefaultApplicationRoles();
+            if (orgRolesJson.has(targetApp) && orgRolesJson.get(targetApp).isArray()) {
+                for (var element : orgRolesJson.get(targetApp)) {
+                    rolesToAssign.add(element.asText());
+                }
+            }
+        }
+
+        // Fallback default roles if empty
+        if (rolesToAssign.isEmpty()) {
+            if ("assets".equals(targetApp)) {
+                rolesToAssign.addAll(List.of("ASSET-READ", "ASSET-WRITE", "viewer"));
+            } else {
+                rolesToAssign.add("viewer");
+            }
+        }
+
+        // Assign User Roles (Normalizing role names uppercase / trimmed)
         if (userRoleRepository != null && roleRepository != null) {
-            List<String> defaultRoles = List.of("ASSET-READ", "ASSET-WRITE", "viewer");
             List<UserRole> rolesList = new ArrayList<>();
-            for (String rName : defaultRoles) {
-                roleRepository.findByName(rName).ifPresent(role -> {
+            for (String rName : rolesToAssign) {
+                String normalized = rName.trim().toUpperCase();
+                // Prevent escalation to admin/superadmin via registration defaults
+                if (normalized.contains("ADMIN") || normalized.contains("SUPER") || normalized.contains("OWNER")) {
+                    continue;
+                }
+                roleRepository.findByName(normalized).or(() -> roleRepository.findByName(rName)).ifPresent(role -> {
                     rolesList.add(UserRole.builder()
                             .userId(user.getId())
                             .roleId(role.getId())
@@ -279,50 +445,218 @@ public class AuthController {
             }
         }
 
-        // Organization assignment / creation
-        if (userOrganizationRepository != null && organizationRepository != null) {
-            String orgName = request.getOrganizationName() != null ? request.getOrganizationName().trim() : "";
-            String orgSlug = request.getOrganizationSlug() != null ? request.getOrganizationSlug().trim().toLowerCase() : "";
+        return ResponseEntity.ok("User registered successfully");
+    }
 
-            if (!orgName.isEmpty() || !orgSlug.isEmpty()) {
-                if (orgSlug.isEmpty()) {
-                    orgSlug = orgName.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
-                }
-                Optional<Organization> existingOrg = organizationRepository.findBySlug(orgSlug);
-                Organization targetOrg;
-                String userOrgRole;
+    @PostMapping("/link-account")
+    @jakarta.transaction.Transactional
+    public ResponseEntity<?> linkAccount(
+            @RequestBody com.kuleanasystems.auth.dto.LinkAccountRequest request,
+            Authentication authentication,
+            HttpServletRequest servletRequest) {
 
-                if (existingOrg.isPresent()) {
-                    targetOrg = existingOrg.get();
-                    userOrgRole = "MEMBER";
-                } else {
-                    targetOrg = organizationRepository.save(Organization.builder()
-                            .slug(orgSlug)
-                            .name(!orgName.isEmpty() ? orgName : orgSlug)
-                            .status("active")
-                            .build());
-                    userOrgRole = "ORG_ADMIN";
-                }
+        User user = null;
+        if (authentication != null && authentication.isAuthenticated() && !"anonymousUser".equals(authentication.getPrincipal())) {
+            user = userRepository.findByUsername(authentication.getName()).orElse(null);
+        }
 
-                userOrganizationRepository.save(UserOrganization.builder()
-                        .userId(user.getId())
-                        .orgId(targetOrg.getId())
-                        .role(userOrgRole)
-                        .build());
-            } else {
-                // Link to default organization so user is never orphaned
-                UUID defaultOrgId = UUID.fromString("a0000000-0000-0000-0000-000000000001");
-                organizationRepository.findById(defaultOrgId).ifPresent(defaultOrg -> {
-                    userOrganizationRepository.save(UserOrganization.builder()
-                            .userId(user.getId())
-                            .orgId(defaultOrg.getId())
-                            .role("MEMBER")
-                            .build());
-                });
+        if (user == null) {
+            if (request.getUsername() == null || request.getUsername().isBlank() ||
+                request.getPassword() == null || request.getPassword().isBlank()) {
+                return ResponseEntity.badRequest().body("Username and password are required to link an existing account.");
+            }
+
+            try {
+                Authentication auth = authenticationManager.authenticate(
+                        new UsernamePasswordAuthenticationToken(request.getUsername().trim(), request.getPassword())
+                );
+                user = userRepository.findByUsername(auth.getName()).orElse(null);
+            } catch (BadCredentialsException ex) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid username or password.");
             }
         }
 
-        return ResponseEntity.ok("User registered successfully");
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not found.");
+        }
+
+        String targetApp = (request.getAppName() != null && !request.getAppName().isBlank())
+                ? request.getAppName().trim().toLowerCase() : "assets";
+
+        // Validate Captcha if user was not already authenticated
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            boolean checkCaptcha = true;
+            if (appRegistrationConfigRepository != null) {
+                checkCaptcha = appRegistrationConfigRepository.findByAppName(targetApp)
+                        .map(com.kuleanasystems.auth.entity.AppRegistrationConfig::getRequireCaptcha)
+                        .orElse(true);
+            }
+            if (checkCaptcha) {
+                String clientIp = servletRequest.getHeader("X-Forwarded-For");
+                if (clientIp != null && clientIp.contains(",")) clientIp = clientIp.split(",")[0].trim();
+                if (clientIp == null || clientIp.isBlank()) clientIp = servletRequest.getRemoteAddr();
+                boolean captchaPassed = captchaVerificationService.verifyCaptcha(request.getCaptchaToken(), clientIp);
+                if (!captchaPassed) {
+                    return ResponseEntity.badRequest().body("Captcha verification failed. Please try again.");
+                }
+            }
+        }
+
+        // Resolve target Organization
+        Organization targetOrg = null;
+        if (organizationRepository != null) {
+            String orgSlug = request.getOrganizationSlug() != null ? request.getOrganizationSlug().trim().toLowerCase() : "";
+            if (!orgSlug.isEmpty()) {
+                targetOrg = organizationRepository.findBySlug(orgSlug).orElse(null);
+            }
+            if (targetOrg == null) {
+                targetOrg = organizationRepository.findFirstByIsDefaultTrue()
+                        .or(() -> organizationRepository.findBySlug("default-org"))
+                        .or(() -> organizationRepository.findById(UUID.fromString("a0000000-0000-0000-0000-000000000001")))
+                        .orElse(null);
+            }
+        }
+
+        if (targetOrg == null) {
+            return ResponseEntity.badRequest().body("Target organization could not be resolved.");
+        }
+
+        if (Boolean.FALSE.equals(targetOrg.getAllowPublicRegistration())) {
+            boolean alreadyMember = userOrganizationRepository != null &&
+                    userOrganizationRepository.findByUserIdAndOrgId(user.getId(), targetOrg.getId()).isPresent();
+            if (!alreadyMember) {
+                return ResponseEntity.badRequest().body("Public registration is disabled for this organization.");
+            }
+        }
+
+        // 1. Link to Organization
+        if (userOrganizationRepository != null) {
+            var existingUO = userOrganizationRepository.findByUserIdAndOrgId(user.getId(), targetOrg.getId());
+            if (existingUO.isEmpty()) {
+                userOrganizationRepository.save(UserOrganization.builder()
+                        .userId(user.getId())
+                        .orgId(targetOrg.getId())
+                        .role("MEMBER")
+                        .build());
+            }
+        }
+
+        // 2. Link to Sub-Application
+        String primaryRole = "VIEWER";
+        Set<String> rolesToAssign = new HashSet<>();
+
+        if (appRegistrationConfigRepository != null) {
+            var appConfig = appRegistrationConfigRepository.findByAppName(targetApp);
+            if (appConfig.isPresent()) {
+                primaryRole = appConfig.get().getDefaultPrimaryRole();
+                if (appConfig.get().getDefaultRoles() != null) {
+                    rolesToAssign.addAll(appConfig.get().getDefaultRoles());
+                }
+            }
+        }
+
+        if (userApplicationRepository != null) {
+            var existingApp = userApplicationRepository.findByUserIdAndAppName(user.getId(), targetApp);
+            if (existingApp.isEmpty()) {
+                userApplicationRepository.save(UserApplication.builder()
+                        .userId(user.getId())
+                        .appName(targetApp)
+                        .status("active")
+                        .primaryRole(primaryRole)
+                        .build());
+            } else if (!"active".equalsIgnoreCase(existingApp.get().getStatus())) {
+                var ua = existingApp.get();
+                ua.setStatus("active");
+                userApplicationRepository.save(ua);
+            }
+        }
+
+        // 3. Organization default roles
+        if (targetOrg.getDefaultApplicationRoles() != null) {
+            var orgRolesJson = targetOrg.getDefaultApplicationRoles();
+            if (orgRolesJson.has(targetApp) && orgRolesJson.get(targetApp).isArray()) {
+                for (var elem : orgRolesJson.get(targetApp)) {
+                    rolesToAssign.add(elem.asText());
+                }
+            }
+        }
+
+        if (rolesToAssign.isEmpty()) {
+            if ("assets".equals(targetApp)) {
+                rolesToAssign.addAll(List.of("ASSET-READ", "ASSET-WRITE", "viewer"));
+            } else {
+                rolesToAssign.add("viewer");
+            }
+        }
+
+        // 4. Assign default roles (preventing admin escalation)
+        final UUID finalUserId = user.getId();
+        if (userRoleRepository != null && roleRepository != null) {
+            List<UserRole> existingRoles = userRoleRepository.findByUserId(finalUserId);
+            Set<UUID> existingRoleIds = existingRoles.stream().map(UserRole::getRoleId).collect(Collectors.toSet());
+
+            List<UserRole> newRolesList = new ArrayList<>();
+            for (String rName : rolesToAssign) {
+                String normalized = rName.trim().toUpperCase();
+                if (normalized.contains("ADMIN") || normalized.contains("SUPER") || normalized.contains("OWNER")) {
+                    continue;
+                }
+                roleRepository.findByName(normalized).or(() -> roleRepository.findByName(rName)).ifPresent(role -> {
+                    if (!existingRoleIds.contains(role.getId())) {
+                        newRolesList.add(UserRole.builder()
+                                .userId(finalUserId)
+                                .roleId(role.getId())
+                                .status("active")
+                                .build());
+                    }
+                });
+            }
+            if (!newRolesList.isEmpty()) {
+                userRoleRepository.saveAll(newRolesList);
+            }
+        }
+
+        // 5. Generate fresh token
+        boolean isSuper = userRoleRepository != null && userRoleRepository.findByUserId(user.getId()).stream()
+                .anyMatch(ur -> {
+                    String rName = ur.getRole() != null ? ur.getRole().getName() : "";
+                    return "SUPERADMIN".equalsIgnoreCase(rName) || "ROLE_SUPERADMIN".equalsIgnoreCase(rName) || "owner".equalsIgnoreCase(rName);
+                });
+
+        List<Map<String, Object>> orgs = getUserOrganizations(user.getId(), isSuper);
+        String orgIdsClaim = orgs.stream().map(o -> String.valueOf(o.get("id"))).collect(Collectors.joining(","));
+        
+        List<String> userRoles = new ArrayList<>();
+        if (userRoleRepository != null) {
+            userRoles = userRoleRepository.findByUserId(user.getId()).stream()
+                    .map(ur -> ur.getRole() != null ? ur.getRole().getName() : "")
+                    .filter(r -> !r.isBlank())
+                    .collect(Collectors.toList());
+        }
+        String rolesStr = String.join(",", userRoles);
+
+        String jwt = tokenProvider.generateToken(user.getUsername(), rolesStr, targetOrg.getId().toString(), orgIdsClaim);
+
+        ResponseCookie cookie = ResponseCookie.from("jwt", jwt)
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(24 * 60 * 60)
+                .sameSite("None")
+                .build();
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("message", "Account successfully linked to " + targetOrg.getName() + " for " + targetApp + "!");
+        resp.put("username", user.getUsername());
+        resp.put("organizationName", targetOrg.getName());
+        resp.put("organizationSlug", targetOrg.getSlug());
+        resp.put("appName", targetApp);
+        resp.put("token", jwt);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(resp);
     }
 
     public static final List<String> SECURITY_QUESTION_POOL = List.of(

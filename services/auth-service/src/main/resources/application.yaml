@@ -64,6 +64,11 @@ app:
   jwtExpirationMs: ${APP_JWT_EXPIRATION_MS:86400000}
 
 security:
+  captcha:
+    turnstile:
+      site-key: ${TURNSTILE_SITE_KEY:1x00000000000000000000AA}
+      secret-key: ${TURNSTILE_SECRET_KEY:1x0000000000000000000000000000000AA}
+      enabled: ${TURNSTILE_ENABLED:true}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:4173,http://127.0.0.1:4173,https://test.assets.kahua.com,https://*.web.app,https://*.firebaseapp.com}
   rate-limit:
