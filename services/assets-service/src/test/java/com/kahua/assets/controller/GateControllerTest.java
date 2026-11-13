@@ -83,7 +83,7 @@ class GateControllerTest {
 
     @Test
     void getGates_shouldReturn200() throws Exception {
-        when(gateService.searchGates(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(gateService.searchGates(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of(mockGate));
 
         mockMvc.perform(get("/api/gates")
@@ -94,7 +94,7 @@ class GateControllerTest {
 
     @Test
     void getGates_shouldReturn204IfEmpty() throws Exception {
-        when(gateService.searchGates(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(gateService.searchGates(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/gates"))

@@ -86,7 +86,7 @@ class ShiftControllerTest {
 
     @Test
     void getShifts_shouldReturn200() throws Exception {
-        when(shiftService.searchShifts(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(null)))
+        when(shiftService.searchShifts(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(null)))
                 .thenReturn(List.of(mockShift));
 
         mockMvc.perform(get("/api/shifts")
@@ -97,7 +97,7 @@ class ShiftControllerTest {
 
     @Test
     void getShifts_shouldReturn204IfEmpty() throws Exception {
-        when(shiftService.searchShifts(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(null)))
+        when(shiftService.searchShifts(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(null)))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/shifts"))
@@ -106,7 +106,7 @@ class ShiftControllerTest {
 
     @Test
     void getActiveShift_shouldReturn200() throws Exception {
-        when(shiftService.searchShifts(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(true)))
+        when(shiftService.searchShifts(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(true)))
                 .thenReturn(List.of(mockShift));
 
         mockMvc.perform(get("/api/shifts/active"))
@@ -116,7 +116,7 @@ class ShiftControllerTest {
 
     @Test
     void getActiveShift_shouldReturn204IfNoActiveShift() throws Exception {
-        when(shiftService.searchShifts(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(true)))
+        when(shiftService.searchShifts(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), eq(true)))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/shifts/active"))

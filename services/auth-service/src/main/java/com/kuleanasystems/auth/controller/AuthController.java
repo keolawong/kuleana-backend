@@ -310,18 +310,18 @@ public class AuthController {
             }
             boolean captchaPassed = captchaVerificationService.verifyCaptcha(request.getCaptchaToken(), clientIp);
             if (!captchaPassed) {
-                return ResponseEntity.badRequest().body("Error: Captcha verification failed. Please try again.");
+                return ResponseEntity.badRequest().body(Map.of("message", "Error: Captcha verification failed. Please try again."));
             }
         }
 
         try {
             PasswordValidator.validate(request.getPassword(), request.getUsername(), request.getFirstName(), request.getLastName());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
 
         if (request.getSecurityQuestions() == null || request.getSecurityQuestions().size() < 3) {
-            return ResponseEntity.badRequest().body("Error: 3 security questions are required.");
+            return ResponseEntity.badRequest().body(Map.of("message", "Error: 3 security questions are required."));
         }
 
         User user = User.builder()
@@ -445,7 +445,7 @@ public class AuthController {
             }
         }
 
-        return ResponseEntity.ok("User registered successfully");
+        return ResponseEntity.ok(Map.of("success", true, "message", "User registered successfully"));
     }
 
     @PostMapping("/link-account")
@@ -463,7 +463,7 @@ public class AuthController {
         if (user == null) {
             if (request.getUsername() == null || request.getUsername().isBlank() ||
                 request.getPassword() == null || request.getPassword().isBlank()) {
-                return ResponseEntity.badRequest().body("Username and password are required to link an existing account.");
+                return ResponseEntity.badRequest().body(Map.of("message", "Username and password are required to link an existing account."));
             }
 
             try {
@@ -472,12 +472,12 @@ public class AuthController {
                 );
                 user = userRepository.findByUsername(auth.getName()).orElse(null);
             } catch (BadCredentialsException ex) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid username or password.");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Invalid username or password."));
             }
         }
 
         if (user == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not found.");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "User not found."));
         }
 
         String targetApp = (request.getAppName() != null && !request.getAppName().isBlank())
@@ -497,7 +497,7 @@ public class AuthController {
                 if (clientIp == null || clientIp.isBlank()) clientIp = servletRequest.getRemoteAddr();
                 boolean captchaPassed = captchaVerificationService.verifyCaptcha(request.getCaptchaToken(), clientIp);
                 if (!captchaPassed) {
-                    return ResponseEntity.badRequest().body("Captcha verification failed. Please try again.");
+                    return ResponseEntity.badRequest().body(Map.of("message", "Captcha verification failed. Please try again."));
                 }
             }
         }

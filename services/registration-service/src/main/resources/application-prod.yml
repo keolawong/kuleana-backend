@@ -1,0 +1,6 @@
+spring:
+  jpa:
+    show-sql: false
+
+gcp:
+  tasks-enabled: ${GCP_TASKS_ENABLED:true}

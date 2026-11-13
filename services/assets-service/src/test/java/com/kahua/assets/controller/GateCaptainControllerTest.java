@@ -93,7 +93,7 @@ class GateCaptainControllerTest {
 
     @Test
     void getGateCaptains_shouldReturn200() throws Exception {
-        when(gateCaptainService.searchGateCaptains(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(gateCaptainService.searchGateCaptains(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of(mockCaptain));
 
         mockMvc.perform(get("/api/gate-captains")
@@ -104,7 +104,7 @@ class GateCaptainControllerTest {
 
     @Test
     void getGateCaptains_shouldReturn204IfEmpty() throws Exception {
-        when(gateCaptainService.searchGateCaptains(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(gateCaptainService.searchGateCaptains(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/gate-captains"))

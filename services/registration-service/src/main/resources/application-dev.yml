@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost:5432}/${DB_NAME:kuleana_dev}?currentSchema=registration
+    username: ${DB_APP_USER:postgres}
+    password: ${DB_APP_PASSWORD:postgres}
+  flyway:
+    url: jdbc:postgresql://${DB_HOST:localhost:5432}/${DB_NAME:kuleana_dev}
+    user: ${DB_MIGRATION_USER:postgres}
+    password: ${DB_MIGRATION_PASSWORD:postgres}
+    placeholders:
+      db_app_user: ${DB_APP_USER:postgres}
+  jpa:
+    show-sql: true
+
+gcp:
+  tasks-enabled: false

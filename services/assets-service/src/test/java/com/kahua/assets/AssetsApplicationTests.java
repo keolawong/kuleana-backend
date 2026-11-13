@@ -32,7 +32,7 @@ class AssetsApplicationTests {
 			UUID opId = operation.getOperationId();
 			// Search for shifts associated with this operation under activeOperation = true
 			List<Shift> shifts = shiftService.searchShifts(
-					null, opId, null, null, null, null, null, null, null, null, null, true);
+					null, opId, null, null, null, null, null, null, null, null, null, null, true);
 
 			for (Shift shift : shifts) {
 				assertNotNull(shift.getOperation(), "Shift operation should not be null");

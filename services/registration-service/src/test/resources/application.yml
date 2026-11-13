@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:registration_test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;INIT=CREATE SCHEMA IF NOT EXISTS registration
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  flyway:
+    enabled: false
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: registration
+
+gcp:
+  tasks-enabled: false
+
+app:
+  jwtSecret: your-256-bit-secret-your-256-bit-secret
+  jwtExpirationMs: 86400000
+
+security:
+  cors:
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173
+  internal-task-api-key: test-internal-key

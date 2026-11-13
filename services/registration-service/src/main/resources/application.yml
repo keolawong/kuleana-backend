@@ -1,0 +1,78 @@
+server:
+  port: ${PORT:8084}
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: registration
+
+  # 1. Spring Data JPA Core (Uses low-privilege runtime user)
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost:5432}/${DB_NAME:neondb}?sslmode=require&currentSchema=registration
+    username: ${DB_APP_USER:registration_app}
+    password: ${DB_APP_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+
+  # 2. Flyway Schema Migrator (Overrides connection to use high-privilege owner)
+  flyway:
+    enabled: true
+    url: jdbc:postgresql://${DB_HOST:localhost:5432}/${DB_NAME:neondb}?sslmode=require
+    user: ${DB_MIGRATION_USER:neondb_owner}
+    password: ${DB_MIGRATION_PASSWORD:}
+    schemas: registration
+    create-schemas: true
+    validate-on-migrate: false
+    placeholders:
+      db_app_user: ${DB_APP_USER:registration_app}
+
+  # 3. Hibernate Configuration
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: registration
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  info:
+    env:
+      enabled: true
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name},%X{traceId:-},%X{spanId:-}]"
+
+cloud:
+  run:
+    url: ${CLOUD_RUN_URL:}
+
+gcp:
+  project-id: ${GCP_PROJECT_ID:project-3eaeea86-ca1c-4d5b-ae6}
+  location: ${GCP_LOCATION:us-central1}
+  queue-name: ${GCP_QUEUE_NAME:registration-outbox-queue}
+  tasks-enabled: ${GCP_TASKS_ENABLED:false}
+
+app:
+  jwtSecret: ${APP_JWTSECRET:your-256-bit-secret-your-256-bit-secret}
+  jwtExpirationMs: ${APP_JWT_EXPIRATION_MS:86400000}
+
+security:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:3000,http://localhost:3001,http://localhost:4173,https://*.web.app,https://*.firebaseapp.com}
+  internal-task-api-key: ${INTERNAL_TASK_API_KEY:default-internal-key-change-me}
+
+kahua:
+  assets:
+    base-url: ${ASSETS_BASE_URL:http://localhost:8081}
